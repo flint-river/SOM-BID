@@ -3531,7 +3531,13 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <div class="drag-item training" draggable="true" data-value="TRN" data-type="special">TRN</div>
     </div>
 ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e8e8;">
-        <button onclick="undoChange()" class="edit-btn" title="Undo">↩ UNDO</button>
+        <div style="position:relative; display:inline-block;">
+            <button onclick="undoChange()" class="edit-btn" title="Undo" style="border-radius:4px 0 0 4px; margin-right:0;">↩ UNDO</button><button onclick="toggleUndoDropdown()" class="edit-btn" title="Undo History" style="border-radius:0 4px 4px 0; padding:5px 6px; margin-left:-1px; border-left:1px solid rgba(255,255,255,0.3);">▼</button>
+            <div id="undoDropdown" style="display:none; position:absolute; top:100%; left:0; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); min-width:200px; max-height:250px; overflow:auto; z-index:1000;">
+                <div style="padding:6px 10px; background:#f5f5f5; border-bottom:1px solid #eee; font-size:10px; color:#666;"><b>Undo History</b></div>
+                <div id="undoList"></div>
+            </div>
+        </div>
         <button onclick="redoChange()" class="edit-btn" title="Redo">↪ REDO</button>
         <button onclick="resetToOriginal()" class="edit-btn reset-btn" title="Reset to Original">🔄 RESET</button>
         <button id="swapModeBtn" onclick="toggleSwapMode()" class="edit-btn" style="background:#9b59b6; margin-left:10px;" title="Switch to Give Shift mode to give your shifts to comparison line">🔄 Give Shift Mode</button>
@@ -3684,6 +3690,40 @@ function redoChange() {
     } else {
         alert('Nothing to redo');
     }
+}
+
+var undoDropdownOpen = false;
+
+function toggleUndoDropdown() {
+    var dropdown = document.getElementById('undoDropdown');
+    if (!dropdown) return;
+    undoDropdownOpen = !undoDropdownOpen;
+    dropdown.style.display = undoDropdownOpen ? 'block' : 'none';
+    if (undoDropdownOpen) updateUndoList();
+}
+
+function updateUndoList() {
+    var list = document.getElementById('undoList');
+    if (!list) return;
+    if (undoStack.length === 0) {
+        list.innerHTML = '<div style="padding:10px; color:#888; text-align:center; font-size:10px;">No changes yet</div>';
+        return;
+    }
+    var html = '';
+    for (var i = undoStack.length - 1; i >= 0; i--) {
+        var num = undoStack.length - i;
+        html += '<div onclick="undoToStep(' + i + ')" style="padding:6px 10px; cursor:pointer; border-bottom:1px solid #eee; font-size:10px;" onmouseover="this.style.background=\'#e8f4fd\'" onmouseout="this.style.background=\'\'">' + num + '. Change</div>';
+    }
+    list.innerHTML = html;
+}
+
+function undoToStep(index) {
+    redoStack.push(captureState());
+    if (undoStack[index]) {
+        restoreState(undoStack[index]);
+    }
+    undoStack = undoStack.slice(0, index);
+    toggleUndoDropdown();
 }
 
 function resetToOriginal() {
