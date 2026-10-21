@@ -2171,35 +2171,7 @@ function isLineConfirmed(lineNbr) {
     }
 
     // Custom Dropdown Functions
-    function handleLineInput(id, value) {
-        var lineNbr = value.trim();
-        var hidden = document.getElementById('manualCompareLine' + id);
-        var selected = document.querySelector('#dropdown' + id + ' .dropdown-selected');
-        var input = document.getElementById('lineInput' + id);
-        
-        if (!lineNbr) {
-            // Clear selection
-            hidden.value = '';
-            var placeholder = (id === 'A' || id === 'B') ? 'or Select' : '(optional)';
-            selected.innerHTML = '<span>' + placeholder + '</span><span style="margin-left:auto;color:#4ecca3;">▼</span>';
-            input.style.borderColor = '#4ecca3';
-            return;
-        }
-        
-        // Check if valid line number
-        var lineData = ANNUAL_BID.find(function(l) { return l.lineNbr === lineNbr; });
-        if (lineData) {
-            hidden.value = lineNbr;
-            var displayHtml = '<span style="color:#4ecca3; font-weight:bold;">Line ' + lineNbr + '</span> <span style="color:#888;">(' + lineData.lineDesc + ')</span>';
-            selected.innerHTML = displayHtml + '<span style="margin-left:auto;color:#4ecca3;">▼</span>';
-            input.style.borderColor = '#4ecca3';
-        } else {
-            // Invalid line number
-            hidden.value = '';
-            input.style.borderColor = '#e94560';
-        }
-    }
-    
+
     function toggleDropdown(id) {
         var options = document.getElementById('options' + id);
         var allOptions = document.querySelectorAll('.dropdown-options');
@@ -2262,13 +2234,13 @@ function isLineConfirmed(lineNbr) {
     
     function populateManualCompareDropdowns() {
         var dropdownIds = ['A', 'B', 'C', 'D', 'E'];
-        var placeholders = ['or Select', 'or Select', '(optional)', '(optional)', '(optional)'];
+        var placeholders = ['Select Line', 'Select Line', '(optional)', '(optional)', '(optional)'];
         
         dropdownIds.forEach(function(id, idx) {
             var optionsContainer = document.getElementById('options' + id);
             if (!optionsContainer) return;
             
-            var html = '<div class="dropdown-clear" onclick="clearDropdownSelection(\'' + id + '\', \'' + placeholders[idx] + '\')">' + (placeholders[idx] === 'or Select' ? 'Clear' : placeholders[idx]) + '</div>';
+            var html = '<div class="dropdown-clear" onclick="clearDropdownSelection(\'' + id + '\', \'' + placeholders[idx] + '\')">' + (placeholders[idx] === 'Select Line' ? 'Clear' : placeholders[idx]) + '</div>';
             
             // Add all lines with pattern preview
             ANNUAL_BID.forEach(function(line) {
@@ -3398,17 +3370,37 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .edit-btn:hover { background: #e0e0e0; }
 .reset-btn { background: #dc3545; color: white; border-color: #dc3545; }
 .reset-btn:hover { background: #c82333; }
+/* Custom dropdown for line selector */
+.line-dropdown { position: relative; display: inline-block; min-width: 280px; }
+.line-dropdown-selected { display: flex; align-items: center; padding: 6px 10px; background: #16213e; color: #4ecca3; border: 1px solid #4ecca3; border-radius: 5px; cursor: pointer; font-size: 12px; }
+.line-dropdown-selected:hover { background: #1a2744; }
+.line-dropdown-options { display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; background: #16213e; border: 1px solid #4ecca3; border-radius: 5px; z-index: 1000; margin-top: 2px; }
+.line-dropdown-options.show { display: block; }
+.line-dropdown-option { display: flex; flex-direction: column; padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #333; }
+.line-dropdown-option:hover { background: #2d4a6f; }
+.line-dropdown-option:last-child { border-bottom: none; }
+.line-dropdown-option .line-name { color: #4ecca3; font-weight: bold; font-size: 11px; margin-bottom: 4px; }
+.line-dropdown-option .line-pattern { display: flex; gap: 1px; flex-wrap: nowrap; }
+.line-dropdown-option .pattern-day { width: 24px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; border-radius: 2px; }
+.line-dropdown-option .pattern-day.off { background: #00FF00; color: #000; }
+.line-dropdown-option .pattern-day.work { background: #FFC000; color: #000; }
+.line-dropdown-clear { padding: 8px 10px; color: #888; cursor: pointer; border-bottom: 1px solid #333; }
+.line-dropdown-clear:hover { background: #2d4a6f; color: #fff; }
 </style>
 </head>
 <body>
 <div class="toolbar no-print">
     <button onclick="goBackToMain()" style="background:#6c757d; color:white; font-weight:bold;">&#8592; Back</button>
     <button onclick="downloadAsHTML()" style="background:#28a745; color:white; font-weight:bold; margin-left:10px;">SAVE</button>
-    <span style="margin-left:15px; border-left:2px solid #ccc; padding-left:15px;">
+    <span style="margin-left:15px; border-left:2px solid #ccc; padding-left:15px; display:flex; align-items:center; gap:8px;">
         <label style="font-weight:bold; color:#333;">Switch Line:</label>
-        <select id="lineSelector" onchange="switchLine()" style="padding:4px 8px; font-size:12px; min-width:200px;">
-            <option value="">-- Current: Line ${displayNum} --</option>
-        </select>
+        <div class="line-dropdown" id="lineDropdown">
+            <div class="line-dropdown-selected" onclick="toggleLineDropdown()">
+                <span>Current: Line ${displayNum} (${lineType})</span>
+                <span style="margin-left:auto;color:#4ecca3;">▼</span>
+            </div>
+            <div class="line-dropdown-options" id="lineDropdownOptions"></div>
+        </div>
     </span>
     <span style="margin-left:20px; color:#666; font-size:11px;">Click any shift cell to edit</span>
 </div>
@@ -4473,9 +4465,35 @@ function clearComparisonLine() {
 }
 
 // Line switcher functionality
+function toggleLineDropdown() {
+    var options = document.getElementById('lineDropdownOptions');
+    options.classList.toggle('show');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.line-dropdown')) {
+        var options = document.getElementById('lineDropdownOptions');
+        if (options) options.classList.remove('show');
+    }
+});
+
+function renderPatternPreviewHTML(days) {
+    var html = '<div class="line-pattern">';
+    for (var i = 0; i < days.length; i++) {
+        var d = days[i];
+        var isOff = d === '--' || d === '-';
+        var cls = isOff ? 'off' : 'work';
+        var text = isOff ? '--' : d.substring(0, 3);
+        html += '<div class="pattern-day ' + cls + '">' + text + '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
 function populateLineSelector() {
-    var select = document.getElementById('lineSelector');
-    if (!select) return;
+    var container = document.getElementById('lineDropdownOptions');
+    if (!container) return;
 
     // Group lines by type
     var ssomLines = [];
@@ -4494,38 +4512,40 @@ function populateLineSelector() {
     ssomLines.sort(function(a, b) { return allLinesData[a].displayNum - allLinesData[b].displayNum; });
     somLines.sort(function(a, b) { return allLinesData[a].displayNum - allLinesData[b].displayNum; });
 
-    // Add SSOM group
-    var ssomGroup = document.createElement('optgroup');
-    ssomGroup.label = 'SSOM Lines';
-    ssomLines.forEach(function(lineKey) {
-        var line = allLinesData[lineKey];
-        if (line.lineNbr === CURRENT_LINE) return; // Skip current line
-        var opt = document.createElement('option');
-        opt.value = lineKey;
-        opt.textContent = 'Line ' + line.displayNum + ': ' + line.patternSnippet;
-        ssomGroup.appendChild(opt);
-    });
-    if (ssomGroup.children.length > 0) select.appendChild(ssomGroup);
+    var html = '';
 
-    // Add SOM group
-    var somGroup = document.createElement('optgroup');
-    somGroup.label = 'SOM Lines';
-    somLines.forEach(function(lineKey) {
-        var line = allLinesData[lineKey];
-        if (line.lineNbr === CURRENT_LINE) return; // Skip current line
-        var opt = document.createElement('option');
-        opt.value = lineKey;
-        opt.textContent = 'Line ' + line.displayNum + ': ' + line.patternSnippet;
-        somGroup.appendChild(opt);
-    });
-    if (somGroup.children.length > 0) select.appendChild(somGroup);
+    // Add SSOM header and lines
+    if (ssomLines.length > 0) {
+        html += '<div style="padding:6px 10px; color:#e94560; font-weight:bold; font-size:10px; border-bottom:1px solid #333;">SSOM Lines</div>';
+        ssomLines.forEach(function(lineKey) {
+            var line = allLinesData[lineKey];
+            if (line.lineNbr === CURRENT_LINE) return; // Skip current line
+            var days = line.days || [];
+            html += '<div class="line-dropdown-option" onclick="selectLine(\\'' + lineKey + '\\')">';
+            html += '<span class="line-name">Line ' + line.displayNum + ' (' + line.lineDesc + ')</span>';
+            html += renderPatternPreviewHTML(days);
+            html += '</div>';
+        });
+    }
+
+    // Add SOM header and lines
+    if (somLines.length > 0) {
+        html += '<div style="padding:6px 10px; color:#4ecca3; font-weight:bold; font-size:10px; border-bottom:1px solid #333;">SOM Lines</div>';
+        somLines.forEach(function(lineKey) {
+            var line = allLinesData[lineKey];
+            if (line.lineNbr === CURRENT_LINE) return; // Skip current line
+            var days = line.days || [];
+            html += '<div class="line-dropdown-option" onclick="selectLine(\\'' + lineKey + '\\')">';
+            html += '<span class="line-name">Line ' + line.displayNum + ' (' + line.lineDesc + ')</span>';
+            html += renderPatternPreviewHTML(days);
+            html += '</div>';
+        });
+    }
+
+    container.innerHTML = html;
 }
 
-function switchLine() {
-    var select = document.getElementById('lineSelector');
-    var lineKey = select.value;
-    if (!lineKey) return;
-
+function selectLine(lineKey) {
     // Store the selected line and go back - main page will detect and reopen
     sessionStorage.setItem('switchToLine', lineKey);
     history.back();

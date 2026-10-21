@@ -268,57 +268,42 @@
                 <div style="display:flex; gap:15px; margin-bottom:10px; flex-wrap:wrap; align-items:flex-end;">
                     <div>
                         <label style="color:#ccc; font-size:12px; display:block; margin-bottom:5px;">Line A:</label>
-                        <div style="display:flex; gap:5px; align-items:center;">
-                            <input type="text" id="lineInputA" placeholder="#" maxlength="2" style="width:40px; padding:8px 4px; border-radius:5px; background:#16213e; color:#4ecca3; border:1px solid #4ecca3; font-size:14px; text-align:center; font-weight:bold;" onkeyup="handleLineInput('A', this.value)" onchange="handleLineInput('A', this.value)">
-                            <div class="custom-dropdown" id="dropdownA">
-                                <div class="dropdown-selected" onclick="toggleDropdown('A')"><span>or Select</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
-                                <div class="dropdown-options" id="optionsA"></div>
-                                <input type="hidden" id="manualCompareLineA" value="">
-                            </div>
+                        <div class="custom-dropdown" id="dropdownA">
+                            <div class="dropdown-selected" onclick="toggleDropdown('A')"><span>Select Line</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
+                            <div class="dropdown-options" id="optionsA"></div>
+                            <input type="hidden" id="manualCompareLineA" value="">
                         </div>
                     </div>
                     <div>
                         <label style="color:#ccc; font-size:12px; display:block; margin-bottom:5px;">Line B:</label>
-                        <div style="display:flex; gap:5px; align-items:center;">
-                            <input type="text" id="lineInputB" placeholder="#" maxlength="2" style="width:40px; padding:8px 4px; border-radius:5px; background:#16213e; color:#4ecca3; border:1px solid #4ecca3; font-size:14px; text-align:center; font-weight:bold;" onkeyup="handleLineInput('B', this.value)" onchange="handleLineInput('B', this.value)">
-                            <div class="custom-dropdown" id="dropdownB">
-                                <div class="dropdown-selected" onclick="toggleDropdown('B')"><span>or Select</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
-                                <div class="dropdown-options" id="optionsB"></div>
-                                <input type="hidden" id="manualCompareLineB" value="">
-                            </div>
+                        <div class="custom-dropdown" id="dropdownB">
+                            <div class="dropdown-selected" onclick="toggleDropdown('B')"><span>Select Line</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
+                            <div class="dropdown-options" id="optionsB"></div>
+                            <input type="hidden" id="manualCompareLineB" value="">
                         </div>
                     </div>
                     <div>
                         <label style="color:#ccc; font-size:12px; display:block; margin-bottom:5px;">Line C:</label>
-                        <div style="display:flex; gap:5px; align-items:center;">
-                            <input type="text" id="lineInputC" placeholder="#" maxlength="2" style="width:40px; padding:8px 4px; border-radius:5px; background:#16213e; color:#4ecca3; border:1px solid #4ecca3; font-size:14px; text-align:center; font-weight:bold;" onkeyup="handleLineInput('C', this.value)" onchange="handleLineInput('C', this.value)">
-                            <div class="custom-dropdown" id="dropdownC">
-                                <div class="dropdown-selected" onclick="toggleDropdown('C')"><span>(optional)</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
-                                <div class="dropdown-options" id="optionsC"></div>
-                                <input type="hidden" id="manualCompareLineC" value="">
-                            </div>
+                        <div class="custom-dropdown" id="dropdownC">
+                            <div class="dropdown-selected" onclick="toggleDropdown('C')"><span>(optional)</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
+                            <div class="dropdown-options" id="optionsC"></div>
+                            <input type="hidden" id="manualCompareLineC" value="">
                         </div>
                     </div>
                     <div>
                         <label style="color:#ccc; font-size:12px; display:block; margin-bottom:5px;">Line D:</label>
-                        <div style="display:flex; gap:5px; align-items:center;">
-                            <input type="text" id="lineInputD" placeholder="#" maxlength="2" style="width:40px; padding:8px 4px; border-radius:5px; background:#16213e; color:#4ecca3; border:1px solid #4ecca3; font-size:14px; text-align:center; font-weight:bold;" onkeyup="handleLineInput('D', this.value)" onchange="handleLineInput('D', this.value)">
-                            <div class="custom-dropdown" id="dropdownD">
-                                <div class="dropdown-selected" onclick="toggleDropdown('D')"><span>(optional)</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
-                                <div class="dropdown-options" id="optionsD"></div>
-                                <input type="hidden" id="manualCompareLineD" value="">
-                            </div>
+                        <div class="custom-dropdown" id="dropdownD">
+                            <div class="dropdown-selected" onclick="toggleDropdown('D')"><span>(optional)</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
+                            <div class="dropdown-options" id="optionsD"></div>
+                            <input type="hidden" id="manualCompareLineD" value="">
                         </div>
                     </div>
                     <div>
                         <label style="color:#ccc; font-size:12px; display:block; margin-bottom:5px;">Line E:</label>
-                        <div style="display:flex; gap:5px; align-items:center;">
-                            <input type="text" id="lineInputE" placeholder="#" maxlength="2" style="width:40px; padding:8px 4px; border-radius:5px; background:#16213e; color:#4ecca3; border:1px solid #4ecca3; font-size:14px; text-align:center; font-weight:bold;" onkeyup="handleLineInput('E', this.value)" onchange="handleLineInput('E', this.value)">
-                            <div class="custom-dropdown" id="dropdownE">
-                                <div class="dropdown-selected" onclick="toggleDropdown('E')"><span>(optional)</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
-                                <div class="dropdown-options" id="optionsE"></div>
-                                <input type="hidden" id="manualCompareLineE" value="">
-                            </div>
+                        <div class="custom-dropdown" id="dropdownE">
+                            <div class="dropdown-selected" onclick="toggleDropdown('E')"><span>(optional)</span><span style="margin-left:auto;color:#4ecca3;">▼</span></div>
+                            <div class="dropdown-options" id="optionsE"></div>
+                            <input type="hidden" id="manualCompareLineE" value="">
                         </div>
                     </div>
                     <button class="btn" onclick="showManualComparison()" style="background:#e94560; color:#fff; padding:8px 20px;">Compare Lines</button>
