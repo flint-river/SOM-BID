@@ -4527,6 +4527,11 @@ document.addEventListener('click', function(e) {
         var partnerOpts = document.getElementById('partnerDropdownOptions');
         if (partnerOpts) partnerOpts.classList.remove('show');
     }
+    // Close Your Edit line picker dropdown (on main page)
+    if (!e.target.closest('#yourEditLineDropdown')) {
+        var yourEditOpts = document.getElementById('yourEditLineDropdownOptions');
+        if (yourEditOpts) yourEditOpts.classList.remove('show');
+    }
 });
 
 function renderPatternPreviewHTML(days) {
@@ -6472,123 +6477,130 @@ window.addEventListener('DOMContentLoaded', function() {
 
     function hideYourEditPicker() {
         document.getElementById('yourEditPickerModal').style.display = 'none';
+        // Also close the dropdown
+        const opts = document.getElementById('yourEditLineDropdownOptions');
+        if (opts) opts.classList.remove('show');
+    }
+
+    function toggleYourEditLineDropdown() {
+        const opts = document.getElementById('yourEditLineDropdownOptions');
+        if (opts) opts.classList.toggle('show');
+    }
+
+    function selectYourEditLine(lineNbr) {
+        const hiddenInput = document.getElementById('yourEditLinePicker');
+        const dropdownText = document.getElementById('yourEditLineDropdownText');
+        const opts = document.getElementById('yourEditLineDropdownOptions');
+
+        if (hiddenInput) hiddenInput.value = lineNbr;
+
+        // Update display text
+        if (dropdownText) {
+            const lineData = ANNUAL_BID.find(l => l.lineNbr === lineNbr);
+            if (lineData) {
+                const parts = lineNbr.split('-');
+                const displayNum = parts[0];
+                const lineType = parts.length > 1 ? parts[1] : '';
+                dropdownText.textContent = `Line ${displayNum} (${lineType})`;
+            }
+        }
+
+        // Close dropdown
+        if (opts) opts.classList.remove('show');
     }
 
     function populateYourEditLinePicker() {
-        const select = document.getElementById('yourEditLinePicker');
-        if (!select) return;
+        const optionsDiv = document.getElementById('yourEditLineDropdownOptions');
+        if (!optionsDiv) return;
 
         // Clear existing options
-        select.innerHTML = '<option value="">-- Choose a line --</option>';
+        optionsDiv.innerHTML = '';
 
         // Get favorites
         const favorites = loadFavorites();
 
+        // Helper to render pattern preview HTML
+        function renderPatternPreview(lineData) {
+            let html = '<div class="pattern-preview">';
+            for (let i = 0; i < 12; i++) {
+                const shift = lineData.days[i];
+                const isOff = shift === '--';
+                const bgColor = isOff ? '#22c55e' : '#f97316';
+                const textColor = '#fff';
+                html += '<div class="pattern-day" style="background:' + bgColor + ';color:' + textColor + ';">' + shift + '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
         // Add favorited lines first
         if (favorites.length > 0) {
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = '★ Favorites';
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'line-dropdown-group';
+            groupDiv.textContent = '★ Favorites';
+            optionsDiv.appendChild(groupDiv);
 
             favorites.forEach(lineNbr => {
                 const lineData = ANNUAL_BID.find(l => l.lineNbr === lineNbr);
                 if (lineData) {
-                    const opt = document.createElement('option');
-                    opt.value = lineNbr;
                     const parts = lineNbr.split('-');
                     const displayNum = parts[0];
                     const lineType = parts.length > 1 ? parts[1] : '';
-                    opt.textContent = `★ Line ${displayNum}${lineType ? ' (' + lineType + ')' : ''} - ${lineData.lineDesc}`;
-                    optgroup.appendChild(opt);
+
+                    const optDiv = document.createElement('div');
+                    optDiv.className = 'line-dropdown-option';
+                    optDiv.onclick = function() { selectYourEditLine(lineNbr); };
+                    optDiv.innerHTML = '<div class="line-name">★ Line ' + displayNum + ' (' + lineType + ')</div>' + renderPatternPreview(lineData);
+                    optionsDiv.appendChild(optDiv);
                 }
             });
-
-            select.appendChild(optgroup);
         }
 
         // Add all lines grouped by type
         const ssomLines = ANNUAL_BID.filter(l => l.lineNbr.includes('-SSOM'));
         const somLines = ANNUAL_BID.filter(l => l.lineNbr.includes('-SOM') && !l.lineNbr.includes('-SSOM'));
-        const otherLines = ANNUAL_BID.filter(l => !l.lineNbr.includes('-SSOM') && !l.lineNbr.includes('-SOM'));
 
         if (ssomLines.length > 0) {
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = 'SSOM Lines';
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'line-dropdown-group';
+            groupDiv.textContent = 'SSOM Lines';
+            optionsDiv.appendChild(groupDiv);
+
             ssomLines.forEach(line => {
-                const opt = document.createElement('option');
-                opt.value = line.lineNbr;
                 const parts = line.lineNbr.split('-');
                 const displayNum = parts[0];
                 const isFav = favorites.includes(line.lineNbr);
-                opt.textContent = `${isFav ? '★ ' : ''}Line ${displayNum} (SSOM) - ${line.lineDesc}`;
-                optgroup.appendChild(opt);
+
+                const optDiv = document.createElement('div');
+                optDiv.className = 'line-dropdown-option';
+                optDiv.onclick = function() { selectYourEditLine(line.lineNbr); };
+                optDiv.innerHTML = '<div class="line-name">' + (isFav ? '★ ' : '') + 'Line ' + displayNum + ' (SSOM)</div>' + renderPatternPreview(line);
+                optionsDiv.appendChild(optDiv);
             });
-            select.appendChild(optgroup);
         }
 
         if (somLines.length > 0) {
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = 'SOM Lines';
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'line-dropdown-group';
+            groupDiv.textContent = 'SOM Lines';
+            optionsDiv.appendChild(groupDiv);
+
             somLines.forEach(line => {
-                const opt = document.createElement('option');
-                opt.value = line.lineNbr;
                 const parts = line.lineNbr.split('-');
                 const displayNum = parts[0];
                 const isFav = favorites.includes(line.lineNbr);
-                opt.textContent = `${isFav ? '★ ' : ''}Line ${displayNum} (SOM) - ${line.lineDesc}`;
-                optgroup.appendChild(opt);
+
+                const optDiv = document.createElement('div');
+                optDiv.className = 'line-dropdown-option';
+                optDiv.onclick = function() { selectYourEditLine(line.lineNbr); };
+                optDiv.innerHTML = '<div class="line-name">' + (isFav ? '★ ' : '') + 'Line ' + displayNum + ' (SOM)</div>' + renderPatternPreview(line);
+                optionsDiv.appendChild(optDiv);
             });
-            select.appendChild(optgroup);
         }
 
-        if (otherLines.length > 0) {
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = 'Other Lines';
-            otherLines.forEach(line => {
-                const opt = document.createElement('option');
-                opt.value = line.lineNbr;
-                const isFav = favorites.includes(line.lineNbr);
-                opt.textContent = `${isFav ? '★ ' : ''}Line ${line.lineNbr} - ${line.lineDesc}`;
-                optgroup.appendChild(opt);
-            });
-            select.appendChild(optgroup);
-        }
-
-        // Add change listener for preview
-        select.onchange = previewYourEditLine;
-    }
-
-    function previewYourEditLine() {
-        const select = document.getElementById('yourEditLinePicker');
-        const previewDiv = document.getElementById('yourEditLinePreview');
-        const previewContent = document.getElementById('yourEditPreviewContent');
-
-        const lineNbr = select.value;
-        if (!lineNbr) {
-            previewDiv.style.display = 'none';
-            return;
-        }
-
-        const lineData = ANNUAL_BID.find(l => l.lineNbr === lineNbr);
-        if (!lineData) {
-            previewDiv.style.display = 'none';
-            return;
-        }
-
-        // Build preview showing pattern
-        let patternHtml = '<div style="display:flex; gap:3px; margin-top:8px;">';
-        for (let i = 0; i < 12; i++) {
-            const dayCode = lineData.dayCodes[i];
-            const bgColor = getColorForCode(dayCode);
-            const textColor = needsLightText(dayCode) ? '#fff' : '#000';
-            patternHtml += `<div style="width:35px; height:28px; background:${bgColor}; color:${textColor}; display:flex; align-items:center; justify-content:center; border-radius:3px; font-size:10px; font-weight:bold;">${lineData.days[i]}</div>`;
-        }
-        patternHtml += '</div>';
-
-        previewContent.innerHTML = `
-            <div style="font-weight:bold; color:#4ecca3;">${lineData.lineDesc}</div>
-            ${patternHtml}
-        `;
-        previewDiv.style.display = 'block';
+        // Reset selection state
+        document.getElementById('yourEditLinePicker').value = '';
+        document.getElementById('yourEditLineDropdownText').textContent = '-- Choose a line --';
     }
 
     function launchYourEdit() {
@@ -9742,6 +9754,8 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.openYourEditStandalone = openYourEditStandalone;
     window.hideYourEditPicker = hideYourEditPicker;
     window.launchYourEdit = launchYourEdit;
+    window.toggleYourEditLineDropdown = toggleYourEditLineDropdown;
+    window.selectYourEditLine = selectYourEditLine;
 
     // Change a desk's group assignment
     async function changeDeskAssignment(desk, newGroup) {

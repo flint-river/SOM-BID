@@ -618,14 +618,14 @@
 
             <div style="background:#0f3460; padding:20px; border-radius:8px; margin-bottom:15px;">
                 <label style="color:#4ecca3; font-size:14px; display:block; margin-bottom:10px;">Select Your Line:</label>
-                <select id="yourEditLinePicker" style="width:100%; padding:12px; border-radius:8px; background:#16213e; color:#fff; border:2px solid #6d28d9; font-size:14px;">
-                    <option value="">-- Choose a line --</option>
-                </select>
-
-                <div id="yourEditLinePreview" style="margin-top:15px; padding:10px; background:#16213e; border-radius:5px; display:none;">
-                    <div style="color:#888; font-size:11px;">Preview:</div>
-                    <div id="yourEditPreviewContent" style="color:#fff; margin-top:5px;"></div>
+                <div class="line-dropdown" id="yourEditLineDropdown" style="min-width:100%;">
+                    <div class="line-dropdown-selected" onclick="toggleYourEditLineDropdown()">
+                        <span id="yourEditLineDropdownText">-- Choose a line --</span>
+                        <span style="margin-left:auto;color:#4ecca3;">▼</span>
+                    </div>
+                    <div class="line-dropdown-options" id="yourEditLineDropdownOptions" style="max-height:350px;"></div>
                 </div>
+                <input type="hidden" id="yourEditLinePicker" value="">
             </div>
 
             <div style="display:flex; gap:10px; justify-content:flex-end;">
