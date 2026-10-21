@@ -3318,7 +3318,13 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 <body>
 <div class="toolbar no-print">
     <button onclick="downloadAsHTML()" style="background:#28a745; color:white; font-weight:bold;">SAVE</button>
-    <span style="margin-left:20px; color:#666;">Click any shift cell to edit - colors update automatically</span>
+    <span style="margin-left:15px; border-left:2px solid #ccc; padding-left:15px;">
+        <label style="font-weight:bold; color:#333;">Switch Line:</label>
+        <select id="lineSelector" onchange="switchLine()" style="padding:4px 8px; font-size:12px; min-width:200px;">
+            <option value="">-- Current: Line ${displayNum} --</option>
+        </select>
+    </span>
+    <span style="margin-left:20px; color:#666; font-size:11px;">Click any shift cell to edit</span>
 </div>
 
 <div class="tabs no-print">
@@ -4379,6 +4385,75 @@ function clearComparisonLine() {
         compareCells[c].style.color = '';
     }
 }
+
+// Line switcher functionality
+function populateLineSelector() {
+    var select = document.getElementById('lineSelector');
+    if (!select) return;
+
+    // Group lines by type
+    var ssomLines = [];
+    var somLines = [];
+
+    Object.keys(allLinesData).forEach(function(lineKey) {
+        var line = allLinesData[lineKey];
+        if (line.lineDesc && line.lineDesc.toUpperCase().includes('SSOM')) {
+            ssomLines.push(lineKey);
+        } else {
+            somLines.push(lineKey);
+        }
+    });
+
+    // Sort by display number
+    ssomLines.sort(function(a, b) { return allLinesData[a].displayNum - allLinesData[b].displayNum; });
+    somLines.sort(function(a, b) { return allLinesData[a].displayNum - allLinesData[b].displayNum; });
+
+    // Add SSOM group
+    var ssomGroup = document.createElement('optgroup');
+    ssomGroup.label = 'SSOM Lines';
+    ssomLines.forEach(function(lineKey) {
+        var line = allLinesData[lineKey];
+        if (line.lineNbr === CURRENT_LINE) return; // Skip current line
+        var opt = document.createElement('option');
+        opt.value = lineKey;
+        opt.textContent = 'Line ' + line.displayNum + ': ' + line.patternSnippet;
+        ssomGroup.appendChild(opt);
+    });
+    if (ssomGroup.children.length > 0) select.appendChild(ssomGroup);
+
+    // Add SOM group
+    var somGroup = document.createElement('optgroup');
+    somGroup.label = 'SOM Lines';
+    somLines.forEach(function(lineKey) {
+        var line = allLinesData[lineKey];
+        if (line.lineNbr === CURRENT_LINE) return; // Skip current line
+        var opt = document.createElement('option');
+        opt.value = lineKey;
+        opt.textContent = 'Line ' + line.displayNum + ': ' + line.patternSnippet;
+        somGroup.appendChild(opt);
+    });
+    if (somGroup.children.length > 0) select.appendChild(somGroup);
+}
+
+function switchLine() {
+    var select = document.getElementById('lineSelector');
+    var lineKey = select.value;
+    if (!lineKey) return;
+
+    // Try to use parent window to open new Your Edit
+    if (window.opener && !window.opener.closed && window.opener.exportYearOverviewHTML) {
+        window.opener.exportYearOverviewHTML(lineKey);
+        window.close();
+    } else {
+        alert('Cannot switch lines - parent window not available.\\nPlease use the Your Edit button on the main page.');
+        select.value = '';
+    }
+}
+
+// Initialize line selector on page load
+window.addEventListener('DOMContentLoaded', function() {
+    populateLineSelector();
+});
 </script>
 </body>
 </html>`;
