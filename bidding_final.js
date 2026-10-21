@@ -5959,6 +5959,87 @@ function clearComparisonLine() {
         }
     }
 
+    // Export My Life dates to JSON file
+    function exportMyLifeDates() {
+        const dates = loadMyLifeDates();
+        if (dates.length === 0) {
+            alert('No dates to export. Add some important dates first!');
+            return;
+        }
+
+        const exportData = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            bidYear: typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : 2026,
+            dates: dates
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `my-life-dates-${exportData.bidYear}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Import My Life dates from JSON file
+    function importMyLifeDates(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importData = JSON.parse(e.target.result);
+
+                // Validate the data
+                if (!importData.dates || !Array.isArray(importData.dates)) {
+                    alert('Invalid file format. Please select a valid My Life dates file.');
+                    return;
+                }
+
+                // Ask user what to do with existing dates
+                const existingDates = loadMyLifeDates();
+                let newDates;
+
+                if (existingDates.length > 0) {
+                    const action = confirm(
+                        `You have ${existingDates.length} existing date(s).\n\n` +
+                        `Click OK to MERGE with imported dates.\n` +
+                        `Click Cancel to REPLACE with imported dates.`
+                    );
+
+                    if (action) {
+                        // Merge - add imported dates to existing
+                        newDates = [...existingDates, ...importData.dates];
+                    } else {
+                        // Replace - use only imported dates
+                        newDates = importData.dates;
+                    }
+                } else {
+                    newDates = importData.dates;
+                }
+
+                saveMyLifeDates(newDates);
+                renderMyLifeList();
+
+                alert(`Successfully imported ${importData.dates.length} date(s)!`);
+
+            } catch (err) {
+                console.error('Import error:', err);
+                alert('Error reading file. Please make sure it\'s a valid JSON file.');
+            }
+        };
+
+        reader.readAsText(file);
+
+        // Reset the input so the same file can be selected again
+        event.target.value = '';
+    }
+
     // Check if a date is in My Life dates (for calendar highlighting)
     function isMyLifeDate(dateStr) {
         const myLifeDates = loadMyLifeDates();
@@ -9116,6 +9197,8 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.clearAllMyLifeDates = clearAllMyLifeDates;
     window.analyzeMyLifeLines = analyzeMyLifeLines;
     window.filterMyLifeResults = filterMyLifeResults;
+    window.exportMyLifeDates = exportMyLifeDates;
+    window.importMyLifeDates = importMyLifeDates;
 
     // Change a desk's group assignment
     async function changeDeskAssignment(desk, newGroup) {

@@ -579,7 +579,12 @@
             <div style="background:#0f3460; padding:15px; border-radius:8px; margin-bottom:15px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h4 style="color:#ec4899; margin:0;">Your Important Dates</h4>
-                    <button class="btn" onclick="clearAllMyLifeDates()" style="background:#e94560; color:white; padding:5px 10px; font-size:11px;">Clear All</button>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn" onclick="exportMyLifeDates()" style="background:#0d9488; color:white; padding:5px 10px; font-size:11px;">📥 Save</button>
+                        <button class="btn" onclick="document.getElementById('myLifeImportInput').click()" style="background:#0891b2; color:white; padding:5px 10px; font-size:11px;">📤 Load</button>
+                        <input type="file" id="myLifeImportInput" accept=".json" style="display:none;" onchange="importMyLifeDates(event)">
+                        <button class="btn" onclick="clearAllMyLifeDates()" style="background:#e94560; color:white; padding:5px 10px; font-size:11px;">Clear All</button>
+                    </div>
                 </div>
                 <div id="myLifeDatesList" style="max-height:150px; overflow-y:auto;">
                     <p style="color:#888; font-size:12px;">No important dates added yet. Add dates above to find your perfect line!</p>
