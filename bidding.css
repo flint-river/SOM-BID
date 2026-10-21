@@ -1123,6 +1123,57 @@
                 size: landscape;
                 margin: 0.15in;
             }
+
+            /* Year Overview Print Styles */
+            #yearview.print-this,
+            #yearview.print-this * {
+                visibility: visible !important;
+            }
+            #yearview.print-this {
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                background: white !important;
+                padding: 0.25in !important;
+                box-sizing: border-box !important;
+            }
+            #yearview.print-this .no-print {
+                display: none !important;
+            }
+            #yearview.print-this .pattern-table {
+                width: 100% !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+                font-size: 8px !important;
+            }
+            #yearview.print-this .pattern-table td {
+                padding: 3px 2px !important;
+                min-width: 0 !important;
+                border: 1px solid #666 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #yearview.print-this .schedule-table {
+                width: 100% !important;
+                max-width: none !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+                font-size: 9px !important;
+            }
+            #yearview.print-this .schedule-table th,
+            #yearview.print-this .schedule-table td {
+                padding: 4px !important;
+                border: 1px solid #666 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            body.print-letter #yearview.print-this {
+                max-width: 10.5in !important;
+            }
+            body.print-legal #yearview.print-this {
+                max-width: 13.5in !important;
+            }
         }
 
         /* Bid History Styles */
