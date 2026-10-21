@@ -3957,8 +3957,8 @@ var FIREBASE_URL = '${typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getFirebase
 var CURRENT_BID_YEAR = ${bidYear};
 var CURRENT_LINE = '${displayNum}';
 var comparisonLineData = null;
-var swapPartners = [];  // Array of {lineKey, displayLabel, data, give: 0, receive: 0}
-var activePartner = null;  // Currently displayed partner
+var swapPartners = [];
+var activePartner = null;
 
 // Seasonal desks data for proper shift transformation
 var SEASONAL_DESKS = ${JSON.stringify(window.SEASONAL_DESKS || [])};
