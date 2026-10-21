@@ -3535,17 +3535,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <div class="drag-item training" draggable="true" data-value="TRN" data-type="special">TRN</div>
     </div>
 ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e8e8;">
-        <div style="display:inline-block; position:relative;">
-            <button onclick="undoChange()" class="edit-btn" title="Undo last change" style="border-radius:4px 0 0 4px; border-right:none;">↩ UNDO</button><button onclick="toggleUndoHistory()" class="edit-btn" title="Undo History" style="border-radius:0 4px 4px 0; padding:6px 8px;">▼</button>
-            <div id="undoHistoryDropdown" style="display:none; position:absolute; top:100%; left:0; min-width:320px; background:#fff; border:2px solid #666; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:1000; margin-top:2px;">
-                <div style="padding:8px 12px; background:#f0f0f0; border-bottom:1px solid #ccc; font-weight:bold; font-size:11px;">Undo History (click to restore)</div>
-                <div id="undoHistoryList" style="max-height:200px; overflow-y:auto;"></div>
-                <div style="padding:6px 12px; border-top:1px solid #ccc; background:#f8f8f8;">
-                    <button onclick="resetToOriginal(); toggleUndoHistory();" class="edit-btn reset-btn" style="font-size:10px; padding:4px 10px;">↩ Restore Original</button>
-                    <span id="undoCountLabel" style="margin-left:10px; font-size:10px; color:#666;"></span>
-                </div>
-            </div>
-        </div>
+        <button onclick="undoChange()" class="edit-btn" title="Undo">↩ UNDO</button>
         <button onclick="redoChange()" class="edit-btn" title="Redo">↪ REDO</button>
         <button onclick="resetToOriginal()" class="edit-btn reset-btn" title="Reset to Original">🔄 RESET</button>
         <button id="swapModeBtn" onclick="toggleSwapMode()" class="edit-btn" style="background:#9b59b6; margin-left:10px;" title="Switch to Give Shift mode to give your shifts to comparison line">🔄 Give Shift Mode</button>
@@ -3722,21 +3712,11 @@ function saveToUndo(description) {
 
     undoStack.push({
         state: currentState,
-        description: description || null, // Will be generated after change is made
+        description: description || 'Change',
         timestamp: new Date()
     });
     redoStack = []; // Clear redo when new change is made
     if (undoStack.length > 50) undoStack.shift(); // Limit history
-
-    // Schedule description generation after the change is made
-    setTimeout(function() {
-        try {
-            updateLastUndoDescription();
-            updateUndoHistoryUI();
-        } catch(e) {
-            console.log('Undo history update error:', e);
-        }
-    }, 100);
 }
 
 function updateLastUndoDescription() {
@@ -3847,13 +3827,15 @@ function formatTime(date) {
 // Close undo dropdown when clicking outside
 document.addEventListener('click', function(e) {
     try {
-        if (undoHistoryOpen && !e.target.closest('#undoHistoryDropdown') && !e.target.closest('[onclick*="toggleUndoHistory"]')) {
-            undoHistoryOpen = false;
-            var dropdown = document.getElementById('undoHistoryDropdown');
-            if (dropdown) dropdown.style.display = 'none';
+        if (typeof undoHistoryOpen !== 'undefined' && undoHistoryOpen && e.target.closest) {
+            if (!e.target.closest('#undoHistoryDropdown') && !e.target.closest('[onclick*="toggleUndoHistory"]')) {
+                undoHistoryOpen = false;
+                var dropdown = document.getElementById('undoHistoryDropdown');
+                if (dropdown) dropdown.style.display = 'none';
+            }
         }
     } catch(err) {
-        // Ignore errors in dropdown close handler
+        // Ignore
     }
 });
 
@@ -4144,10 +4126,10 @@ for (var di = 0; di < dragItems.length; di++) {
         e.dataTransfer.effectAllowed = 'copy';
     });
 
-    // Click handler for sticky/quick-apply mode
-    dragItems[di].addEventListener('click', function(e) {
-        toggleStickyMode(this);
-    });
+    // Click handler for sticky/quick-apply mode - DISABLED FOR DEBUGGING
+    // dragItems[di].addEventListener('click', function(e) {
+    //     toggleStickyMode(this);
+    // });
 }
 
 // Sticky mode variables
@@ -4297,12 +4279,14 @@ function applyStickyToRange(startCell, endCell) {
     clearRangeSelection();
 }
 
-// Escape key to exit sticky mode
+// Escape key to exit sticky mode - DISABLED FOR DEBUGGING
+/*
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && stickyShift) {
         exitStickyMode();
     }
 });
+*/
 
 var shiftCells = document.querySelectorAll('.shift-cell');
 for (var sc = 0; sc < shiftCells.length; sc++) {
@@ -4312,7 +4296,8 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
         selectMainCellForSwap(this);
     });
 
-    // Click handler for sticky mode
+    // Click handler for sticky mode - DISABLED FOR DEBUGGING
+    /*
     shiftCells[sc].addEventListener('click', function(e) {
         // Only handle if in sticky mode
         if (!stickyShift) return;
@@ -4349,15 +4334,10 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
             lastClickedCell = this;
         }
     });
+    */
 
-    // Mousedown - only interfere with contenteditable in swap mode or sticky mode
+    // Mousedown - only interfere with contenteditable in swap mode
     shiftCells[sc].addEventListener('mousedown', function(e) {
-        // In sticky mode, prevent contenteditable from activating
-        if (stickyShift) {
-            e.preventDefault();
-            return;
-        }
-
         // In edit mode, let contenteditable work normally
         if (!swapMode) return;
 
