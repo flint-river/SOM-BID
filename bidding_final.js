@@ -3965,20 +3965,18 @@ var SEASONAL_DESKS = ${JSON.stringify(window.SEASONAL_DESKS || [])};
 
 // All lines data embedded from ANNUAL_BID
 var allLinesData = ${JSON.stringify(
-    ANNUAL_BID.reduce((acc, line) => {
-        const lineKey = line.lineNbr.toString();
+    (ANNUAL_BID || []).reduce((acc, line) => {
+        if (!line || !line.lineNbr) return acc;
+        const lineKey = String(line.lineNbr);
         const numPart = lineKey.split('-')[0];
         const days = line.days || [];
-
-        // Get 12-day pattern snippet
         const patternSnippet = days.slice(0, 12).map(d => d || '--').join(' ');
-
         acc[lineKey] = {
             lineNbr: lineKey,
-            displayNum: parseInt(numPart),
+            displayNum: parseInt(numPart) || 0,
             lineDesc: line.lineDesc || '',
             patternSnippet: patternSnippet,
-            days: days  // Full year's schedule for comparison
+            days: days
         };
         return acc;
     }, {})
