@@ -3675,16 +3675,21 @@ function restoreState(stateData) {
 }
 
 function getChangeDescription(oldState, newState) {
+    // Safety check
+    if (!oldState || !newState || !Array.isArray(oldState) || !Array.isArray(newState)) {
+        return 'Change';
+    }
+
     // Find what changed between states
     let changes = [];
     for (let i = 0; i < oldState.length && i < newState.length; i++) {
-        if (oldState[i].text !== newState[i].text) {
+        if (oldState[i] && newState[i] && oldState[i].text !== newState[i].text) {
             const date = oldState[i].date || '';
             const dateFormatted = date ? formatDateShort(date) : '?';
             changes.push({
                 date: dateFormatted,
-                from: oldState[i].text,
-                to: newState[i].text
+                from: oldState[i].text || '',
+                to: newState[i].text || ''
             });
         }
     }
@@ -3721,8 +3726,12 @@ function saveToUndo(description) {
 
     // Schedule description generation after the change is made
     setTimeout(function() {
-        updateLastUndoDescription();
-        updateUndoHistoryUI();
+        try {
+            updateLastUndoDescription();
+            updateUndoHistoryUI();
+        } catch(e) {
+            console.log('Undo history update error:', e);
+        }
     }, 100);
 }
 
@@ -4129,7 +4138,6 @@ for (var di = 0; di < dragItems.length; di++) {
 
     // Click handler for sticky/quick-apply mode
     dragItems[di].addEventListener('click', function(e) {
-        e.preventDefault();
         toggleStickyMode(this);
     });
 }
