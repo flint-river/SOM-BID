@@ -3203,10 +3203,21 @@ body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; backgroun
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .no-print { display: none !important; }
     .tab-content { display: none !important; }
-    .tab-content.print-this { display: flex !important; flex-direction: column; height: 100%; }
+    .tab-content.print-this { display: block !important; }
     .year-table { flex: 1; height: auto !important; }
     .title { margin: 3px 0 !important; font-size: 16px !important; }
+    /* Summary tab print styles - fit on one page */
+    #summary.print-this { page: auto; }
+    #summary.print-this .summary-section { max-width: 100%; margin: 0; }
+    #summary.print-this .summary-section h3 { padding: 4px 8px; margin-bottom: 5px; font-size: 12px; }
+    #summary.print-this .summary-table { margin-bottom: 8px; }
+    #summary.print-this .summary-table td { padding: 3px 6px; font-size: 10px; }
+    #summary.print-this .summary-table .label { width: 120px; }
+    #summary.print-this .pattern-table td { padding: 4px; min-width: 35px; font-size: 9px; }
+    #summary.print-this .title { font-size: 14px !important; margin: 5px 0 !important; }
 }
+@page summary { size: portrait; margin: 0.3in; }
+body.print-summary { page: summary; }
 body.print-letter { page: letter; }
 body.print-legal { page: legal; }
 body.print-letter .year-table td.shift-cell { height: 22px; font-size: 10px; }
@@ -3603,10 +3614,18 @@ function printTab(tabId) {
     // Mark the tab to print
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('print-this'));
     document.getElementById(tabId).classList.add('print-this');
+
+    // Set portrait mode for summary tab
+    if (tabId === 'summary') {
+        document.body.classList.add('print-summary');
+    }
+
     window.print();
+
     // Clean up after printing
     setTimeout(() => {
         document.getElementById(tabId).classList.remove('print-this');
+        document.body.classList.remove('print-summary');
     }, 500);
 }
 
