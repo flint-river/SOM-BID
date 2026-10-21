@@ -274,6 +274,20 @@
         setTimeout(checkEscalationOnLoad, 1500);
     });
 
+    // Handle returning from Your Edit page with a line switch request
+    window.addEventListener('pageshow', function(event) {
+        const switchToLine = sessionStorage.getItem('switchToLine');
+        if (switchToLine) {
+            sessionStorage.removeItem('switchToLine');
+            // Small delay to ensure page is fully restored
+            setTimeout(function() {
+                if (typeof exportYearOverviewHTML === 'function') {
+                    exportYearOverviewHTML(switchToLine);
+                }
+            }, 100);
+        }
+    });
+
     // Listen for patterns loaded event to ensure calendar is regenerated with seasonal desks
     window.addEventListener('patternsLoaded', (event) => {
         console.log('[BidApp] Patterns loaded event received:', event.detail);
@@ -3317,7 +3331,8 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 </head>
 <body>
 <div class="toolbar no-print">
-    <button onclick="downloadAsHTML()" style="background:#28a745; color:white; font-weight:bold;">SAVE</button>
+    <button onclick="goBackToMain()" style="background:#6c757d; color:white; font-weight:bold;">&#8592; Back</button>
+    <button onclick="downloadAsHTML()" style="background:#28a745; color:white; font-weight:bold; margin-left:10px;">SAVE</button>
     <span style="margin-left:15px; border-left:2px solid #ccc; padding-left:15px;">
         <label style="font-weight:bold; color:#333;">Switch Line:</label>
         <select id="lineSelector" onchange="switchLine()" style="padding:4px 8px; font-size:12px; min-width:200px;">
@@ -4440,14 +4455,13 @@ function switchLine() {
     var lineKey = select.value;
     if (!lineKey) return;
 
-    // Try to use parent window to open new Your Edit
-    if (window.opener && !window.opener.closed && window.opener.exportYearOverviewHTML) {
-        window.opener.exportYearOverviewHTML(lineKey);
-        window.close();
-    } else {
-        alert('Cannot switch lines - parent window not available.\\nPlease use the Your Edit button on the main page.');
-        select.value = '';
-    }
+    // Store the selected line and go back - main page will detect and reopen
+    sessionStorage.setItem('switchToLine', lineKey);
+    history.back();
+}
+
+function goBackToMain() {
+    history.back();
 }
 
 // Initialize line selector on page load
@@ -4458,20 +4472,12 @@ window.addEventListener('DOMContentLoaded', function() {
 </body>
 </html>`;
 
-        // Create blob URL and open in new tab
+        // Create blob URL and open in same tab (no popup issues)
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
-        const newWindow = window.open(blobUrl, '_blank');
 
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-            alert('Popup blocked! The file will download instead. Open it in your browser to view and edit.');
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = 'Line_' + displayNum + '_' + bidYear + '.html';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+        // Navigate in same tab - use location.href for reliable history
+        window.location.href = blobUrl;
     }
 
     function exportCurrentYearOverviewHTML() {
