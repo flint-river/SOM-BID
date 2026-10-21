@@ -3433,13 +3433,20 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
         <button id="swapModeBtn" onclick="toggleSwapMode()" class="edit-btn" style="background:#9b59b6; margin-left:10px;" title="Switch to Give Shift mode to give your shifts to comparison line">🔄 Give Shift Mode</button>
         <span id="modeStatus" style="display:inline-block; margin-left:10px; padding:5px 12px; border-radius:4px; color:#fff; font-size:11px; background:#3498db;"><b>EDIT MODE</b> - Click cells to type</span>
         <span style="margin-left:20px; border-left:2px solid #999; padding-left:15px;">
-            <b>Compare with:</b>
+            <b>Add Partner:</b>
             <select id="compareLineSelect" style="padding:4px; min-width:180px;" onchange="previewComparisonLine()">
                 <option value="">-- Select a line --</option>
             </select>
-            <button onclick="loadComparisonLine()" class="edit-btn" style="background:#9b59b6;">Load</button>
-            <button onclick="clearComparisonLine()" class="edit-btn" style="background:#e74c3c;">Clear</button>
+            <button onclick="addSwapPartner()" class="edit-btn" style="background:#9b59b6;">+ Add</button>
+            <button onclick="clearAllPartners()" class="edit-btn" style="background:#e74c3c;">Clear All</button>
         </span>
+    </div>
+    <div id="partnersPanel" class="no-print" style="display:none; background:#1a1a2e; border:2px solid #9b59b6; border-radius:8px; padding:10px 15px; margin:5px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <b style="color:#9b59b6;">📊 Swap Partners Balance</b>
+            <span id="totalBalance" style="font-size:12px; color:#888;"></span>
+        </div>
+        <div id="partnersList" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
     </div>
     <div id="comparePreview" class="no-print" style="display:none; background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
         <span id="comparePreviewText"></span>
@@ -3827,6 +3834,9 @@ function swapToComparisonCell(compareCell) {
     compareCell.style.background = '#27ae60';
     compareCell.style.color = '#fff';
 
+    // Track this as giving a shift to partner
+    trackSwap('give');
+
     selectedMainCell = null;
 }
 
@@ -3913,6 +3923,8 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
                     draggedSourceCell.style.background = '#95a5a6';
                     draggedSourceCell.style.color = '#fff';
                 }
+                // Track this as receiving a shift from partner
+                trackSwap('receive');
             } else if (draggedType === 'compwork') {
                 // COMP WORK - show desk selection popup
                 showDeskPopup(targetCell);
@@ -3941,6 +3953,8 @@ var FIREBASE_URL = '${typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getFirebase
 var CURRENT_BID_YEAR = ${bidYear};
 var CURRENT_LINE = '${displayNum}';
 var comparisonLineData = null;
+var swapPartners = [];  // Array of {lineKey, displayLabel, data, give: 0, receive: 0}
+var activePartner = null;  // Currently displayed partner
 
 // Seasonal desks data for proper shift transformation
 var SEASONAL_DESKS = ${JSON.stringify(window.SEASONAL_DESKS || [])};
@@ -4046,10 +4060,21 @@ function previewComparisonLine() {
 }
 
 function loadComparisonLine() {
+    // Legacy function - redirects to addSwapPartner
+    addSwapPartner();
+}
+
+function addSwapPartner() {
     var select = document.getElementById('compareLineSelect');
     var lineKey = select.value;
     if (!lineKey) {
         alert('Please select a line from the dropdown');
+        return;
+    }
+
+    // Check if already added
+    if (swapPartners.find(p => p.lineKey === lineKey)) {
+        alert('This line is already added as a swap partner');
         return;
     }
 
@@ -4061,10 +4086,118 @@ function loadComparisonLine() {
 
     var displayLabel = lineInfo.displayNum + '-' + lineInfo.lineDesc;
 
-    // Use embedded data directly - no Firebase fetch needed
-    comparisonLineData = { days: lineInfo.days };
-    displayComparisonLine(displayLabel, comparisonLineData);
-    document.getElementById('comparePreview').innerHTML = '<span style="color:#27ae60;"><b>Line ' + displayLabel + ' loaded</b> - Drag shifts from orange row to swap!</span>';
+    // Add to partners array
+    var partner = {
+        lineKey: lineKey,
+        displayLabel: displayLabel,
+        displayNum: lineInfo.displayNum,
+        data: { days: lineInfo.days },
+        give: 0,
+        receive: 0
+    };
+    swapPartners.push(partner);
+
+    // Update the partners panel
+    updatePartnersPanel();
+
+    // Display this partner
+    setActivePartner(lineKey);
+
+    // Reset dropdown
+    select.value = '';
+    document.getElementById('comparePreview').style.display = 'none';
+}
+
+function setActivePartner(lineKey) {
+    var partner = swapPartners.find(p => p.lineKey === lineKey);
+    if (!partner) return;
+
+    activePartner = partner;
+    comparisonLineData = partner.data;
+    displayComparisonLine(partner.displayLabel, partner.data);
+
+    // Update active styling in panel
+    updatePartnersPanel();
+}
+
+function removeSwapPartner(lineKey) {
+    swapPartners = swapPartners.filter(p => p.lineKey !== lineKey);
+
+    if (activePartner && activePartner.lineKey === lineKey) {
+        activePartner = null;
+        comparisonLineData = null;
+        clearComparisonLine();
+    }
+
+    updatePartnersPanel();
+
+    // If we have other partners, show the first one
+    if (swapPartners.length > 0 && !activePartner) {
+        setActivePartner(swapPartners[0].lineKey);
+    }
+}
+
+function updatePartnersPanel() {
+    var panel = document.getElementById('partnersPanel');
+    var list = document.getElementById('partnersList');
+    var totalEl = document.getElementById('totalBalance');
+
+    if (swapPartners.length === 0) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'block';
+
+    // Calculate totals
+    var totalGive = swapPartners.reduce((sum, p) => sum + p.give, 0);
+    var totalReceive = swapPartners.reduce((sum, p) => sum + p.receive, 0);
+    var netBalance = totalReceive - totalGive;
+    var balanceColor = netBalance > 0 ? '#27ae60' : netBalance < 0 ? '#e74c3c' : '#888';
+
+    totalEl.innerHTML = 'Total: <span style="color:#27ae60;">+' + totalReceive + ' receive</span> / <span style="color:#e74c3c;">-' + totalGive + ' give</span> = <span style="color:' + balanceColor + ';">' + (netBalance >= 0 ? '+' : '') + netBalance + '</span>';
+
+    // Build partner chips
+    var html = '';
+    swapPartners.forEach(function(p) {
+        var isActive = activePartner && activePartner.lineKey === p.lineKey;
+        var bgColor = isActive ? '#9b59b6' : '#16213e';
+        var borderColor = isActive ? '#9b59b6' : '#444';
+        var net = p.receive - p.give;
+        var netColor = net > 0 ? '#27ae60' : net < 0 ? '#e74c3c' : '#888';
+
+        html += '<div style="display:flex; align-items:center; gap:6px; background:' + bgColor + '; border:1px solid ' + borderColor + '; border-radius:6px; padding:6px 10px; cursor:pointer;" onclick="setActivePartner(\'' + p.lineKey + '\')">';
+        html += '<span style="font-weight:bold; color:#fff;">L' + p.displayNum + '</span>';
+        html += '<span style="font-size:10px; color:#ccc;">' + p.displayLabel.split('-')[1].substring(0, 15) + '</span>';
+        html += '<span style="font-size:10px; color:' + netColor + '; border-left:1px solid #444; padding-left:6px;">';
+        html += '+' + p.receive + '/-' + p.give + ' (' + (net >= 0 ? '+' : '') + net + ')';
+        html += '</span>';
+        html += '<button onclick="event.stopPropagation(); removeSwapPartner(\'' + p.lineKey + '\');" style="background:#e74c3c; color:#fff; border:none; border-radius:3px; width:18px; height:18px; font-size:12px; cursor:pointer; line-height:1;">×</button>';
+        html += '</div>';
+    });
+
+    list.innerHTML = html;
+}
+
+function trackSwap(direction) {
+    // Called when a swap happens - direction is 'give' or 'receive'
+    if (!activePartner) return;
+
+    if (direction === 'give') {
+        activePartner.give++;
+    } else if (direction === 'receive') {
+        activePartner.receive++;
+    }
+
+    updatePartnersPanel();
+}
+
+function clearAllPartners() {
+    swapPartners = [];
+    activePartner = null;
+    comparisonLineData = null;
+    updatePartnersPanel();
+    clearComparisonLine();
 }
 
 // Initialize on page load
@@ -4190,6 +4323,9 @@ function setupComparisonDrag() {
                 this.textContent = 'SW-' + draggedValue;
                 this.style.background = '#27ae60';
                 this.style.color = '#fff';
+
+                // Track this as giving a shift to partner
+                trackSwap('give');
             }
         });
     }
@@ -4197,6 +4333,7 @@ function setupComparisonDrag() {
 
 function clearComparisonLine() {
     comparisonLineData = null;
+    activePartner = null;
     document.getElementById('compareLineSelect').value = '';
     document.getElementById('comparePreview').style.display = 'none';
 
@@ -4204,6 +4341,11 @@ function clearComparisonLine() {
     var compareRows = document.querySelectorAll('.compare-row');
     for (var i = 0; i < compareRows.length; i++) {
         compareRows[i].classList.remove('visible');
+        // Reset labels
+        var labels = compareRows[i].querySelectorAll('.month-label');
+        for (var j = 0; j < labels.length; j++) {
+            labels[j].textContent = 'CMP';
+        }
     }
 
     // Reset cells
@@ -4211,6 +4353,8 @@ function clearComparisonLine() {
     for (var c = 0; c < compareCells.length; c++) {
         compareCells[c].textContent = '--';
         compareCells[c].removeAttribute('draggable');
+        compareCells[c].style.background = '';
+        compareCells[c].style.color = '';
     }
 }
 </script>
@@ -6070,9 +6214,158 @@ function clearComparisonLine() {
     }
 
     // ===========================================
+    // YOUR EDIT STANDALONE FUNCTIONS
+    // ===========================================
+
+    function openYourEditStandalone() {
+        // Populate the line picker dropdown
+        populateYourEditLinePicker();
+
+        // Show the modal
+        document.getElementById('yourEditPickerModal').style.display = 'flex';
+    }
+
+    function hideYourEditPicker() {
+        document.getElementById('yourEditPickerModal').style.display = 'none';
+    }
+
+    function populateYourEditLinePicker() {
+        const select = document.getElementById('yourEditLinePicker');
+        if (!select) return;
+
+        // Clear existing options
+        select.innerHTML = '<option value="">-- Choose a line --</option>';
+
+        // Get favorites
+        const favorites = loadFavorites();
+
+        // Add favorited lines first
+        if (favorites.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = '★ Favorites';
+
+            favorites.forEach(lineNbr => {
+                const lineData = ANNUAL_BID.find(l => l.lineNbr === lineNbr);
+                if (lineData) {
+                    const opt = document.createElement('option');
+                    opt.value = lineNbr;
+                    const parts = lineNbr.split('-');
+                    const displayNum = parts[0];
+                    const lineType = parts.length > 1 ? parts[1] : '';
+                    opt.textContent = `★ Line ${displayNum}${lineType ? ' (' + lineType + ')' : ''} - ${lineData.lineDesc}`;
+                    optgroup.appendChild(opt);
+                }
+            });
+
+            select.appendChild(optgroup);
+        }
+
+        // Add all lines grouped by type
+        const ssomLines = ANNUAL_BID.filter(l => l.lineNbr.includes('-SSOM'));
+        const somLines = ANNUAL_BID.filter(l => l.lineNbr.includes('-SOM') && !l.lineNbr.includes('-SSOM'));
+        const otherLines = ANNUAL_BID.filter(l => !l.lineNbr.includes('-SSOM') && !l.lineNbr.includes('-SOM'));
+
+        if (ssomLines.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'SSOM Lines';
+            ssomLines.forEach(line => {
+                const opt = document.createElement('option');
+                opt.value = line.lineNbr;
+                const parts = line.lineNbr.split('-');
+                const displayNum = parts[0];
+                const isFav = favorites.includes(line.lineNbr);
+                opt.textContent = `${isFav ? '★ ' : ''}Line ${displayNum} (SSOM) - ${line.lineDesc}`;
+                optgroup.appendChild(opt);
+            });
+            select.appendChild(optgroup);
+        }
+
+        if (somLines.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'SOM Lines';
+            somLines.forEach(line => {
+                const opt = document.createElement('option');
+                opt.value = line.lineNbr;
+                const parts = line.lineNbr.split('-');
+                const displayNum = parts[0];
+                const isFav = favorites.includes(line.lineNbr);
+                opt.textContent = `${isFav ? '★ ' : ''}Line ${displayNum} (SOM) - ${line.lineDesc}`;
+                optgroup.appendChild(opt);
+            });
+            select.appendChild(optgroup);
+        }
+
+        if (otherLines.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'Other Lines';
+            otherLines.forEach(line => {
+                const opt = document.createElement('option');
+                opt.value = line.lineNbr;
+                const isFav = favorites.includes(line.lineNbr);
+                opt.textContent = `${isFav ? '★ ' : ''}Line ${line.lineNbr} - ${line.lineDesc}`;
+                optgroup.appendChild(opt);
+            });
+            select.appendChild(optgroup);
+        }
+
+        // Add change listener for preview
+        select.onchange = previewYourEditLine;
+    }
+
+    function previewYourEditLine() {
+        const select = document.getElementById('yourEditLinePicker');
+        const previewDiv = document.getElementById('yourEditLinePreview');
+        const previewContent = document.getElementById('yourEditPreviewContent');
+
+        const lineNbr = select.value;
+        if (!lineNbr) {
+            previewDiv.style.display = 'none';
+            return;
+        }
+
+        const lineData = ANNUAL_BID.find(l => l.lineNbr === lineNbr);
+        if (!lineData) {
+            previewDiv.style.display = 'none';
+            return;
+        }
+
+        // Build preview showing pattern
+        let patternHtml = '<div style="display:flex; gap:3px; margin-top:8px;">';
+        for (let i = 0; i < 12; i++) {
+            const dayCode = lineData.dayCodes[i];
+            const bgColor = getColorForCode(dayCode);
+            const textColor = needsLightText(dayCode) ? '#fff' : '#000';
+            patternHtml += `<div style="width:35px; height:28px; background:${bgColor}; color:${textColor}; display:flex; align-items:center; justify-content:center; border-radius:3px; font-size:10px; font-weight:bold;">${lineData.days[i]}</div>`;
+        }
+        patternHtml += '</div>';
+
+        previewContent.innerHTML = `
+            <div style="font-weight:bold; color:#4ecca3;">${lineData.lineDesc}</div>
+            ${patternHtml}
+        `;
+        previewDiv.style.display = 'block';
+    }
+
+    function launchYourEdit() {
+        const select = document.getElementById('yourEditLinePicker');
+        const lineNbr = select.value;
+
+        if (!lineNbr) {
+            alert('Please select a line first.');
+            return;
+        }
+
+        // Close the modal
+        hideYourEditPicker();
+
+        // Open Your Edit with the selected line
+        exportYearOverviewHTML(lineNbr);
+    }
+
+    // ===========================================
     // AUDIT LOG FUNCTIONS
     // ===========================================
-    
+
     var auditLog = [];
     var lastAction = null;
     
@@ -9199,6 +9492,11 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.filterMyLifeResults = filterMyLifeResults;
     window.exportMyLifeDates = exportMyLifeDates;
     window.importMyLifeDates = importMyLifeDates;
+
+    // Your Edit standalone functions
+    window.openYourEditStandalone = openYourEditStandalone;
+    window.hideYourEditPicker = hideYourEditPicker;
+    window.launchYourEdit = launchYourEdit;
 
     // Change a desk's group assignment
     async function changeDeskAssignment(desk, newGroup) {

@@ -65,7 +65,7 @@
             <!-- SWAP/COMPARE GROUP -->
             <div class="btn-group" style="display:inline-flex; gap:4px; background:rgba(139,92,246,0.15); padding:4px 8px; border-radius:8px; border:1px solid rgba(139,92,246,0.3);">
                 <button class="btn" onclick="showSwapCompare()" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white;">🔄 Compare</button>
-                <a href="swap_builder.html" class="btn" style="background:#6d28d9; color:white; text-decoration:none;">🔧 Swap Builder</a>
+                <button class="btn" onclick="openYourEditStandalone()" style="background:#6d28d9; color:white;">✏️ Your Edit</button>
             </div>
 
             <span style="color:#333; margin:0 2px;">│</span>
@@ -621,6 +621,37 @@
         </div>
     </div>
 
+    <!-- Your Edit Line Picker Modal -->
+    <div class="modal-overlay" id="yourEditPickerModal" onclick="hideYourEditPicker()">
+        <div class="modal" style="max-width:600px;" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="hideYourEditPicker()">Close</button>
+            <h3>✏️ Your Edit - Line Selector</h3>
+            <p style="color:#888; font-size:12px; margin-bottom:15px;">
+                Select a line to open in the full-featured Year Overview Editor.
+                You can compare with swap partners, edit shifts, and track balances.
+            </p>
+
+            <div style="background:#0f3460; padding:20px; border-radius:8px; margin-bottom:15px;">
+                <label style="color:#4ecca3; font-size:14px; display:block; margin-bottom:10px;">Select Your Line:</label>
+                <select id="yourEditLinePicker" style="width:100%; padding:12px; border-radius:8px; background:#16213e; color:#fff; border:2px solid #6d28d9; font-size:14px;">
+                    <option value="">-- Choose a line --</option>
+                </select>
+
+                <div id="yourEditLinePreview" style="margin-top:15px; padding:10px; background:#16213e; border-radius:5px; display:none;">
+                    <div style="color:#888; font-size:11px;">Preview:</div>
+                    <div id="yourEditPreviewContent" style="color:#fff; margin-top:5px;"></div>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button class="btn" onclick="hideYourEditPicker()" style="background:#6b7280; color:white;">Cancel</button>
+                <button class="btn" onclick="launchYourEdit()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); color:white; padding:12px 24px;">
+                    ✏️ Open Your Edit
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Audit Log Modal -->
     <div class="modal-overlay" id="auditLogModal" onclick="hideAuditLog()">
         <div class="modal" style="max-width:800px; max-height:80vh;" onclick="event.stopPropagation()">
@@ -891,7 +922,7 @@
                         <li style="margin-bottom:5px;"><strong>bidding_final.js</strong> - Main program (GROUP1 & GROUP2)</li>
                         <li style="margin-bottom:5px;"><strong>bid_confirmation.html</strong> - Confirmation status page</li>
                         <li style="margin-bottom:5px;"><strong>bid_times.html</strong> - Bid schedule page</li>
-                        <li style="margin-bottom:5px;"><strong>swap_builder.html</strong> - Swap tool</li>
+                        <li style="margin-bottom:5px;"><strong style="color:#888;text-decoration:line-through;">swap_builder.html</strong> - <em>(Replaced by Your Edit feature)</em></li>
                     </ul>
                     <p style="color:#4ecca3;">Use the "Download All Updated Files" button in the Export section to get these files!</p>
                     
