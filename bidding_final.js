@@ -1877,8 +1877,26 @@ function isLineConfirmed(lineNbr) {
         const startA = getShiftStartHour(shiftCodeA);
         const startB = getShiftStartHour(shiftCodeB);
         if (startA === null || startB === null) return true;
+
         const endA = getShiftEndHour(startA);
-        let restHours = startB >= endA ? startB - endA : (24 - endA) + startB;
+
+        // Check if shiftA is overnight (starts at noon or later = ends next morning)
+        // Overnight shifts end in the early AM hours of the NEXT calendar day
+        const isOvernightA = startA >= 12;
+
+        let restHours;
+        if (isOvernightA) {
+            // ShiftA ends on day N+1 at hour endA (early morning)
+            // ShiftB starts on day N+1 at hour startB
+            // Rest = startB - endA (can be negative if overlap)
+            restHours = startB - endA;
+        } else {
+            // ShiftA ends on day N at hour endA
+            // ShiftB starts on day N+1 at hour startB
+            // Rest = hours until midnight + hours into next day
+            restHours = (24 - endA) + startB;
+        }
+
         return restHours >= 8;
     }
 
@@ -1905,6 +1923,17 @@ function isLineConfirmed(lineNbr) {
         }
         blocks.push({ start, end, days: [] });
         for (let d = start; d <= end; d++) blocks[blocks.length-1].days.push(d);
+
+        // Check for wraparound: if first block starts at 0 and last block ends at 11, merge them
+        if (blocks.length >= 2 && blocks[0].start === 0 && blocks[blocks.length-1].end === 11) {
+            const first = blocks[0];
+            const last = blocks[blocks.length-1];
+            // Merge last into first (wraparound block)
+            const mergedDays = [...last.days, ...first.days];
+            blocks[0] = { start: last.start, end: first.end, days: mergedDays, wraps: true };
+            blocks.pop();
+        }
+
         return blocks;
     }
 
@@ -1921,10 +1950,38 @@ function isLineConfirmed(lineNbr) {
     function areConsecutive(days) {
         if (days.length <= 1) return true;
         const sorted = [...days].sort((a,b) => a - b);
+
+        // Check for simple consecutive (no wraparound)
+        let simple = true;
         for (let i = 1; i < sorted.length; i++) {
-            if (sorted[i] !== sorted[i-1] + 1) return false;
+            if (sorted[i] !== sorted[i-1] + 1) { simple = false; break; }
         }
-        return true;
+        if (simple) return true;
+
+        // Check for wraparound consecutive (e.g., [0, 1, 10, 11] is 10-11-0-1)
+        // This only works if the gap is exactly at the 11-0 boundary
+        if (sorted[0] === 0 && sorted[sorted.length - 1] === 11) {
+            // Find where the gap is
+            let gapIdx = -1;
+            for (let i = 1; i < sorted.length; i++) {
+                if (sorted[i] !== sorted[i-1] + 1) {
+                    if (gapIdx !== -1) return false; // More than one gap
+                    gapIdx = i;
+                }
+            }
+            // The gap should split into two consecutive runs that meet at 11-0
+            if (gapIdx !== -1) {
+                const lowRun = sorted.slice(0, gapIdx);
+                const highRun = sorted.slice(gapIdx);
+                // lowRun must end at some point, highRun must end at 11, and lowRun must start at 0
+                // So combined: highRun (ending at 11) + lowRun (starting at 0) wraps around
+                if (highRun[highRun.length - 1] === 11 && lowRun[0] === 0) {
+                    return true; // Wraparound consecutive
+                }
+            }
+        }
+
+        return false;
     }
 
     function getMaxConsecutiveFromSet(offDays) {
@@ -1946,8 +2003,9 @@ function isLineConfirmed(lineNbr) {
 
     function analyzeSwapPairs() {
         if (swapAnalysisCache) return swapAnalysisCache;
-        const ssomLines = ANNUAL_BID.filter(l => parseInt(l.lineNbr) <= 14);
-        const somLines = ANNUAL_BID.filter(l => parseInt(l.lineNbr) >= 15);
+        // Filter by lineDesc, not line number - there are overlapping numbers between SSOM and SOM
+        const ssomLines = ANNUAL_BID.filter(l => l.lineDesc === 'SSOM');
+        const somLines = ANNUAL_BID.filter(l => l.lineDesc === 'SOM');
         const results = { fiveSevenOff: { ssom: [], som: [] }, twoDayPickup: { ssom: [], som: [] } };
         analyzeGroup(ssomLines, results, 'ssom');
         analyzeGroup(somLines, results, 'som');
@@ -1998,6 +2056,7 @@ function isLineConfirmed(lineNbr) {
                 twoBlocksA.forEach(blockA2 => {
                     twoBlocksB.forEach(blockB2 => {
                         // Check if blocks are adjacent (A then B, or B then A)
+                        // Account for 12-day cycle wraparound
                         const aEnd = Math.max(...blockA2.days);
                         const aStart = Math.min(...blockA2.days);
                         const bEnd = Math.max(...blockB2.days);
@@ -2007,12 +2066,14 @@ function isLineConfirmed(lineNbr) {
                         let order = null;
 
                         // A's block then B's block (A ends, B starts next day)
-                        if (bStart === aEnd + 1) {
+                        // Include wraparound: day 11 followed by day 0
+                        if (bStart === aEnd + 1 || (aEnd === 11 && bStart === 0)) {
                             combined = [...blockA2.days, ...blockB2.days].sort((a,b) => a - b);
                             order = 'AB';
                         }
                         // B's block then A's block (B ends, A starts next day)
-                        else if (aStart === bEnd + 1) {
+                        // Include wraparound: day 11 followed by day 0
+                        else if (aStart === bEnd + 1 || (bEnd === 11 && aStart === 0)) {
                             combined = [...blockB2.days, ...blockA2.days].sort((a,b) => a - b);
                             order = 'BA';
                         }
