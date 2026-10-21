@@ -279,12 +279,22 @@
         const switchToLine = sessionStorage.getItem('switchToLine');
         if (switchToLine) {
             sessionStorage.removeItem('switchToLine');
-            // Small delay to ensure page is fully restored
-            setTimeout(function() {
-                if (typeof exportYearOverviewHTML === 'function') {
+
+            // Wait for calendar data to be ready before switching
+            function trySwitch(attempts) {
+                if (typeof ALL_LINES_CALENDAR !== 'undefined' && ALL_LINES_CALENDAR[switchToLine]) {
                     exportYearOverviewHTML(switchToLine);
+                } else if (attempts < 20) {
+                    // Retry up to 20 times (2 seconds total)
+                    setTimeout(function() { trySwitch(attempts + 1); }, 100);
+                } else {
+                    console.error('[BidApp] Calendar data not ready for line switch:', switchToLine);
+                    alert('Unable to switch lines - please try again from the main page.');
                 }
-            }, 100);
+            }
+
+            // Start trying after a brief delay
+            setTimeout(function() { trySwitch(0); }, 100);
         }
     });
 
