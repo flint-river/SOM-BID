@@ -3974,13 +3974,13 @@ var allLinesData = ${JSON.stringify(
         acc[lineKey] = {
             lineNbr: lineKey,
             displayNum: parseInt(numPart) || 0,
-            lineDesc: line.lineDesc || '',
+            lineDesc: String(line.lineDesc || '').replace(/[`$\\]/g, ''),
             patternSnippet: patternSnippet,
             days: days
         };
         return acc;
     }, {})
-)};
+).replace(/\\/g, '\\\\').replace(/`/g, '\\`')};
 
 // Populate dropdown on page load
 function loadAllLinesForDropdown() {
@@ -4013,7 +4013,7 @@ function loadAllLinesForDropdown() {
     // Add SSOM lines
     ssomLines.forEach(function(lineKey) {
         var line = allLinesData[lineKey];
-        if (line.displayNum == CURRENT_LINE && line.lineDesc === '${lineType}') return;
+        if (line.lineNbr === CURRENT_LINE) return;
         var option = document.createElement('option');
         option.value = lineKey;
         option.textContent = 'Line ' + line.displayNum + ': ' + line.patternSnippet;
@@ -4030,7 +4030,7 @@ function loadAllLinesForDropdown() {
     // Add SOM lines
     somLines.forEach(function(lineKey) {
         var line = allLinesData[lineKey];
-        if (line.displayNum == CURRENT_LINE && line.lineDesc === '${lineType}') return;
+        if (line.lineNbr === CURRENT_LINE) return;
         var option = document.createElement('option');
         option.value = lineKey;
         option.textContent = 'Line ' + line.displayNum + ': ' + line.patternSnippet;
