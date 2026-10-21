@@ -1452,3 +1452,14 @@
             background: #0f3460;
             border-radius: 6px;
         }
+
+        /* Quick Apply Mode Styles */
+        .drag-item.sticky-selected {
+            outline: 3px solid #e74c3c !important;
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.5) !important;
+            transform: scale(1.05);
+        }
+        .shift-cell.range-selected {
+            outline: 2px solid #3498db !important;
+            background: rgba(52, 152, 219, 0.3) !important;
+        }
