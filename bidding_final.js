@@ -3963,7 +3963,7 @@ var activePartner = null;  // Currently displayed partner
 // Seasonal desks data for proper shift transformation
 var SEASONAL_DESKS = ${JSON.stringify(window.SEASONAL_DESKS || [])};
 
-// All lines data embedded from ANNUAL_BID (count: ${ANNUAL_BID ? ANNUAL_BID.length : 0})
+// All lines data embedded from ANNUAL_BID
 var allLinesData = ${JSON.stringify(
     ANNUAL_BID.reduce((acc, line) => {
         const lineKey = line.lineNbr.toString();
@@ -3983,24 +3983,10 @@ var allLinesData = ${JSON.stringify(
         return acc;
     }, {})
 )};
-console.log('[Your Edit] allLinesData loaded with', Object.keys(allLinesData).length, 'lines');
 
 // Populate dropdown on page load
 function loadAllLinesForDropdown() {
     var select = document.getElementById('compareLineSelect');
-
-    // Debug logging
-    console.log('[Your Edit] Loading lines for dropdown...');
-    console.log('[Your Edit] allLinesData keys:', Object.keys(allLinesData).length);
-
-    if (Object.keys(allLinesData).length === 0) {
-        console.error('[Your Edit] ERROR: No line data available!');
-        var errorOpt = document.createElement('option');
-        errorOpt.disabled = true;
-        errorOpt.textContent = '(No lines loaded - check console)';
-        select.appendChild(errorOpt);
-        return;
-    }
 
     // Separate SSOM and SOM lines
     var ssomLines = [];
