@@ -3706,7 +3706,7 @@ document.querySelectorAll('[contenteditable="true"]').forEach(cell => {
 });
 
 // Desk list for COMP WORK popup
-var ALL_DESKS = [];
+var ALL_DESKS = ${JSON.stringify(allDesksList)};
 
 // Show desk selection popup for COMP WORK
 function showDeskPopup(targetCell) {
@@ -3961,10 +3961,24 @@ var swapPartners = [];
 var activePartner = null;
 
 // Seasonal desks data for proper shift transformation
-var SEASONAL_DESKS = [];
+var SEASONAL_DESKS = ${JSON.stringify(window.SEASONAL_DESKS || [])};
 
-// All lines data - will be populated from main app
+// All lines data - populated from main app
 var allLinesData = {};
+(function() {
+    var ANNUAL_BID = ${JSON.stringify((typeof ANNUAL_BID !== 'undefined' ? ANNUAL_BID : []).map(function(line) {
+        return {
+            lineNbr: line.lineNbr,
+            lineDesc: line.lineDesc,
+            displayNum: parseInt(line.lineNbr.split('-')[0]),
+            days: line.days,
+            patternSnippet: (line.days || []).slice(0, 6).join(' ')
+        };
+    }))};
+    ANNUAL_BID.forEach(function(line) {
+        allLinesData[line.lineNbr] = line;
+    });
+})();
 
 // Populate dropdown on page load
 function loadAllLinesForDropdown() {
@@ -4152,13 +4166,13 @@ function updatePartnersPanel() {
         var net = p.receive - p.give;
         var netColor = net > 0 ? '#27ae60' : net < 0 ? '#e74c3c' : '#888';
 
-        html += '<div style="display:flex; align-items:center; gap:6px; background:' + bgColor + '; border:1px solid ' + borderColor + '; border-radius:6px; padding:6px 10px; cursor:pointer;" onclick="setActivePartner(\'' + p.lineKey + '\')">';
+        html += '<div style="display:flex; align-items:center; gap:6px; background:' + bgColor + '; border:1px solid ' + borderColor + '; border-radius:6px; padding:6px 10px; cursor:pointer;" onclick="setActivePartner(\\'' + p.lineKey + '\\')">';
         html += '<span style="font-weight:bold; color:#fff;">L' + p.displayNum + '</span>';
         html += '<span style="font-size:10px; color:#ccc;">' + p.displayLabel.split('-')[1].substring(0, 15) + '</span>';
         html += '<span style="font-size:10px; color:' + netColor + '; border-left:1px solid #444; padding-left:6px;">';
         html += '+' + p.receive + '/-' + p.give + ' (' + (net >= 0 ? '+' : '') + net + ')';
         html += '</span>';
-        html += '<button onclick="event.stopPropagation(); removeSwapPartner(\'' + p.lineKey + '\');" style="background:#e74c3c; color:#fff; border:none; border-radius:3px; width:18px; height:18px; font-size:12px; cursor:pointer; line-height:1;">×</button>';
+        html += '<button onclick="event.stopPropagation(); removeSwapPartner(\\'' + p.lineKey + '\\');" style="background:#e74c3c; color:#fff; border:none; border-radius:3px; width:18px; height:18px; font-size:12px; cursor:pointer; line-height:1;">×</button>';
         html += '</div>';
     });
 
@@ -4346,54 +4360,6 @@ function clearComparisonLine() {
 </script>
 </body>
 </html>`;
-
-        // DEBUG: Output lines around error location and validate JS
-        const debugLines = html.split('\n');
-        console.log('Total generated HTML lines:', debugLines.length);
-        console.log('--- Lines 1315-1325 ---');
-        for (let i = 1314; i < Math.min(debugLines.length, 1325); i++) {
-            console.log((i + 1) + ': ' + debugLines[i]);
-        }
-        console.log('--- End debug ---');
-
-        // Try to extract and validate the script section
-        const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
-        if (scriptMatch) {
-            const scriptContent = scriptMatch[1];
-            const scriptLines = scriptContent.split('\n');
-            console.log('Script section has', scriptLines.length, 'lines');
-
-            // Find line 1319 relative to script start
-            const scriptStartLine = html.substring(0, html.indexOf('<script>')).split('\n').length;
-            console.log('Script starts at HTML line:', scriptStartLine);
-            const errorLineInScript = 1319 - scriptStartLine;
-            console.log('Error would be at script line:', errorLineInScript);
-
-            if (errorLineInScript > 0 && errorLineInScript <= scriptLines.length) {
-                console.log('--- Script lines around error ---');
-                for (let i = Math.max(0, errorLineInScript - 5); i < Math.min(scriptLines.length, errorLineInScript + 5); i++) {
-                    const marker = (i + 1 === errorLineInScript) ? '>>> ' : '    ';
-                    console.log(marker + (i + 1) + ': ' + scriptLines[i]);
-                }
-            }
-
-            // Try to parse the JavaScript
-            try {
-                new Function(scriptContent);
-                console.log('✓ JavaScript parses successfully');
-            } catch (e) {
-                console.log('✗ JavaScript parse error:', e.message);
-                // Find error position
-                const match = e.message.match(/position (\d+)/);
-                if (match) {
-                    const pos = parseInt(match[1]);
-                    const beforeError = scriptContent.substring(0, pos);
-                    const errorLine = beforeError.split('\n').length;
-                    console.log('Error appears to be around script line:', errorLine);
-                }
-            }
-        }
-        console.log('=== END DEBUG INFO ===');
 
         // Create blob URL and open in new tab
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
