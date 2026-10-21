@@ -3199,7 +3199,7 @@ body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; backgroun
 @page letter { size: 11in 8.5in; margin: 0.25in; }
 @page legal { size: 14in 8.5in; margin: 0.25in; }
 @media print {
-    html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
+    html, body { width: 100%; margin: 0; padding: 0; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .no-print { display: none !important; }
     .tab-content { display: none !important; }
@@ -3207,14 +3207,17 @@ body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; backgroun
     .year-table { flex: 1; height: auto !important; }
     .title { margin: 3px 0 !important; font-size: 16px !important; }
     /* Summary tab print styles - fit on one page */
-    #summary.print-this { page: auto; }
-    #summary.print-this .summary-section { max-width: 100%; margin: 0; }
+    #summary.print-this { page-break-after: avoid; }
+    #summary.print-this .summary-section { max-width: 100%; margin: 0; page-break-inside: avoid; }
     #summary.print-this .summary-section h3 { padding: 4px 8px; margin-bottom: 5px; font-size: 12px; }
     #summary.print-this .summary-table { margin-bottom: 8px; }
     #summary.print-this .summary-table td { padding: 3px 6px; font-size: 10px; }
     #summary.print-this .summary-table .label { width: 120px; }
     #summary.print-this .pattern-table td { padding: 4px; min-width: 35px; font-size: 9px; }
     #summary.print-this .title { font-size: 14px !important; margin: 5px 0 !important; }
+    /* Prevent blank second page */
+    body.print-summary, body.print-summary html { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+    body.print-summary .tabs, body.print-summary .toolbar { display: none !important; }
 }
 @page summary { size: portrait; margin: 0.3in; }
 body.print-summary { page: summary; }
