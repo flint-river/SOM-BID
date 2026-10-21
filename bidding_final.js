@@ -3531,8 +3531,8 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <div class="drag-item training" draggable="true" data-value="TRN" data-type="special">TRN</div>
     </div>
 ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e8e8;">
-        <button onclick="undoChange()" class="edit-btn" title="Undo">↩ UNDO</button>
-        <button onclick="redoChange()" class="edit-btn" title="Redo">↪ REDO</button>
+        <button onclick="undoChange()" class="edit-btn" title="Undo">↩ UNDO <span id="undoCount" style="background:rgba(255,255,255,0.3); padding:1px 5px; border-radius:10px; font-size:9px;">0</span></button>
+        <button onclick="redoChange()" class="edit-btn" title="Redo">↪ REDO <span id="redoCount" style="background:rgba(255,255,255,0.3); padding:1px 5px; border-radius:10px; font-size:9px;">0</span></button>
         <button onclick="resetToOriginal()" class="edit-btn reset-btn" title="Reset to Original">🔄 RESET</button>
         <button id="swapModeBtn" onclick="toggleSwapMode()" class="edit-btn" style="background:#9b59b6; margin-left:10px;" title="Switch to Give Shift mode to give your shifts to comparison line">🔄 Give Shift Mode</button>
         <span id="modeStatus" style="display:inline-block; margin-left:10px; padding:5px 12px; border-radius:4px; color:#fff; font-size:11px; background:#3498db;"><b>EDIT MODE</b> - Click cells to type</span>
@@ -3664,6 +3664,14 @@ function saveToUndo() {
     undoStack.push(captureState());
     redoStack = [];
     if (undoStack.length > 50) undoStack.shift();
+    updateUndoRedoCounts();
+}
+
+function updateUndoRedoCounts() {
+    var undoEl = document.getElementById('undoCount');
+    var redoEl = document.getElementById('redoCount');
+    if (undoEl) undoEl.textContent = undoStack.length;
+    if (redoEl) redoEl.textContent = redoStack.length;
 }
 
 function undoChange() {
@@ -3671,6 +3679,7 @@ function undoChange() {
         redoStack.push(captureState());
         var prevState = undoStack.pop();
         restoreState(prevState);
+        updateUndoRedoCounts();
     } else {
         alert('Nothing to undo');
     }
@@ -3681,6 +3690,7 @@ function redoChange() {
         undoStack.push(captureState());
         var nextState = redoStack.pop();
         restoreState(nextState);
+        updateUndoRedoCounts();
     } else {
         alert('Nothing to redo');
     }
