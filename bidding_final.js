@@ -3530,11 +3530,16 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
         <button onclick="resetToOriginal()" class="edit-btn reset-btn" title="Reset to Original">🔄 RESET</button>
         <button id="swapModeBtn" onclick="toggleSwapMode()" class="edit-btn" style="background:#9b59b6; margin-left:10px;" title="Switch to Give Shift mode to give your shifts to comparison line">🔄 Give Shift Mode</button>
         <span id="modeStatus" style="display:inline-block; margin-left:10px; padding:5px 12px; border-radius:4px; color:#fff; font-size:11px; background:#3498db;"><b>EDIT MODE</b> - Click cells to type</span>
-        <span style="margin-left:20px; border-left:2px solid #999; padding-left:15px;">
+        <span style="margin-left:20px; border-left:2px solid #999; padding-left:15px; display:flex; align-items:center; gap:8px;">
             <b>Add Partner:</b>
-            <select id="compareLineSelect" style="padding:4px; min-width:180px;" onchange="previewComparisonLine()">
-                <option value="">-- Select a line --</option>
-            </select>
+            <div class="line-dropdown" id="partnerDropdown" style="min-width:320px;">
+                <div class="line-dropdown-selected" onclick="togglePartnerDropdown()">
+                    <span id="partnerDropdownText">-- Select a line --</span>
+                    <span style="margin-left:auto;color:#4ecca3;">▼</span>
+                </div>
+                <div class="line-dropdown-options" id="partnerDropdownOptions"></div>
+                <input type="hidden" id="compareLineSelect" value="">
+            </div>
             <button onclick="addSwapPartner()" class="edit-btn" style="background:#9b59b6;">+ Add</button>
             <button onclick="clearAllPartners()" class="edit-btn" style="background:#e74c3c;">Clear All</button>
         </span>
@@ -4086,9 +4091,46 @@ var allLinesData = {};
     });
 })();
 
-// Populate dropdown on page load
+// Toggle partner dropdown
+function togglePartnerDropdown() {
+    var options = document.getElementById('partnerDropdownOptions');
+    options.classList.toggle('show');
+}
+
+// Note: Click handler for closing dropdowns is combined with the line dropdown handler below
+
+// Select a partner line from dropdown
+function selectPartnerLine(lineKey) {
+    var hidden = document.getElementById('compareLineSelect');
+    var displayText = document.getElementById('partnerDropdownText');
+    var options = document.getElementById('partnerDropdownOptions');
+
+    hidden.value = lineKey;
+    var line = allLinesData[lineKey];
+    if (line) {
+        displayText.innerHTML = '<span style="color:#4ecca3;">Line ' + line.displayNum + ' (' + line.lineDesc + ')</span>';
+    }
+    options.classList.remove('show');
+    previewComparisonLine();
+}
+
+// Clear partner selection
+function clearPartnerSelection() {
+    var hidden = document.getElementById('compareLineSelect');
+    var displayText = document.getElementById('partnerDropdownText');
+    var options = document.getElementById('partnerDropdownOptions');
+    var preview = document.getElementById('comparePreview');
+
+    hidden.value = '';
+    displayText.textContent = '-- Select a line --';
+    options.classList.remove('show');
+    preview.style.display = 'none';
+}
+
+// Populate partner dropdown on page load
 function loadAllLinesForDropdown() {
-    var select = document.getElementById('compareLineSelect');
+    var container = document.getElementById('partnerDropdownOptions');
+    if (!container) return;
 
     // Separate SSOM and SOM lines
     var ssomLines = [];
@@ -4107,45 +4149,46 @@ function loadAllLinesForDropdown() {
     ssomLines.sort(function(a, b) { return allLinesData[a].displayNum - allLinesData[b].displayNum; });
     somLines.sort(function(a, b) { return allLinesData[a].displayNum - allLinesData[b].displayNum; });
 
-    // Add SSOM header
-    var ssomHeader = document.createElement('option');
-    ssomHeader.disabled = true;
-    ssomHeader.textContent = '── SSOM Lines ──';
-    ssomHeader.style.fontWeight = 'bold';
-    select.appendChild(ssomHeader);
+    var html = '';
 
-    // Add SSOM lines
-    ssomLines.forEach(function(lineKey) {
-        var line = allLinesData[lineKey];
-        if (line.lineNbr === CURRENT_LINE) return;
-        var option = document.createElement('option');
-        option.value = lineKey;
-        option.textContent = 'Line ' + line.displayNum + ': ' + line.patternSnippet;
-        select.appendChild(option);
-    });
+    // Clear option
+    html += '<div class="line-dropdown-clear" onclick="clearPartnerSelection()">Clear Selection</div>';
 
-    // Add SOM header
-    var somHeader = document.createElement('option');
-    somHeader.disabled = true;
-    somHeader.textContent = '── SOM Lines ──';
-    somHeader.style.fontWeight = 'bold';
-    select.appendChild(somHeader);
+    // Add SSOM header and lines
+    if (ssomLines.length > 0) {
+        html += '<div style="padding:6px 10px; color:#e94560; font-weight:bold; font-size:10px; border-bottom:1px solid #333;">SSOM Lines</div>';
+        ssomLines.forEach(function(lineKey) {
+            var line = allLinesData[lineKey];
+            if (line.lineNbr === CURRENT_LINE) return; // Skip current line
+            var days = line.days || [];
+            html += '<div class="line-dropdown-option" onclick="selectPartnerLine(\\'' + lineKey + '\\')">';
+            html += '<span class="line-name">Line ' + line.displayNum + ' (' + line.lineDesc + ')</span>';
+            html += renderPatternPreviewHTML(days);
+            html += '</div>';
+        });
+    }
 
-    // Add SOM lines
-    somLines.forEach(function(lineKey) {
-        var line = allLinesData[lineKey];
-        if (line.lineNbr === CURRENT_LINE) return;
-        var option = document.createElement('option');
-        option.value = lineKey;
-        option.textContent = 'Line ' + line.displayNum + ': ' + line.patternSnippet;
-        select.appendChild(option);
-    });
+    // Add SOM header and lines
+    if (somLines.length > 0) {
+        html += '<div style="padding:6px 10px; color:#4ecca3; font-weight:bold; font-size:10px; border-bottom:1px solid #333;">SOM Lines</div>';
+        somLines.forEach(function(lineKey) {
+            var line = allLinesData[lineKey];
+            if (line.lineNbr === CURRENT_LINE) return; // Skip current line
+            var days = line.days || [];
+            html += '<div class="line-dropdown-option" onclick="selectPartnerLine(\\'' + lineKey + '\\')">';
+            html += '<span class="line-name">Line ' + line.displayNum + ' (' + line.lineDesc + ')</span>';
+            html += renderPatternPreviewHTML(days);
+            html += '</div>';
+        });
+    }
+
+    container.innerHTML = html;
 }
 
 // Show preview when line is selected
 function previewComparisonLine() {
-    var select = document.getElementById('compareLineSelect');
-    var lineNum = select.value;
+    var hidden = document.getElementById('compareLineSelect');
+    var lineNum = hidden.value;
     var preview = document.getElementById('comparePreview');
     var previewText = document.getElementById('comparePreviewText');
 
@@ -4211,6 +4254,7 @@ function addSwapPartner() {
 
     // Reset dropdown
     select.value = '';
+    document.getElementById('partnerDropdownText').textContent = '-- Select a line --';
     document.getElementById('comparePreview').style.display = 'none';
 }
 
@@ -4441,6 +4485,7 @@ function clearComparisonLine() {
     comparisonLineData = null;
     activePartner = null;
     document.getElementById('compareLineSelect').value = '';
+    document.getElementById('partnerDropdownText').textContent = '-- Select a line --';
     document.getElementById('comparePreview').style.display = 'none';
 
     // Hide all comparison rows
@@ -4470,11 +4515,17 @@ function toggleLineDropdown() {
     options.classList.toggle('show');
 }
 
-// Close dropdown when clicking outside
+// Close all dropdowns when clicking outside
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('.line-dropdown')) {
-        var options = document.getElementById('lineDropdownOptions');
-        if (options) options.classList.remove('show');
+    // Close line selector dropdown
+    if (!e.target.closest('#lineDropdown')) {
+        var lineOpts = document.getElementById('lineDropdownOptions');
+        if (lineOpts) lineOpts.classList.remove('show');
+    }
+    // Close partner dropdown
+    if (!e.target.closest('#partnerDropdown')) {
+        var partnerOpts = document.getElementById('partnerDropdownOptions');
+        if (partnerOpts) partnerOpts.classList.remove('show');
     }
 });
 
