@@ -52,6 +52,7 @@
             <button class="btn" onclick="toggleFavoritesView()" id="favoritesBtn" style="background:#f0a500; color:#1a1a2e;">⭐ Favorites (<span id="favCount">0</span>)</button>
             <a href="#" onclick="openYearTimeline(); return false;" class="btn" style="background:#27ae60; color:white; text-decoration:none;">📅 Year Timeline</a>
             <button class="btn" onclick="showPTOModal()" style="background:#2563eb; color:white;">🏖️ PTO Overlay</button>
+            <button class="btn" onclick="showMyLifeModal()" style="background:#ec4899; color:white;">💝 My Life</button>
             <a href="swap_builder.html" class="btn" style="background:#9b59b6; color:white; text-decoration:none;">🔄 Swap Builder</a>
             <button class="btn" onclick="toggleBidHistoryView()" id="bidHistoryBtn" style="background:#ff6b35; color:white;">📜 Bid History</button>
             <button class="btn" onclick="toggleLiveMode()" id="liveModeBtn" style="display:none; background:#16213e; color:#4ecca3; border:1px solid #4ecca3;">🔴 Live Mode</button>
@@ -485,6 +486,104 @@
                 </div>
                 <div>
                     <button class="btn" onclick="clearAllPTO()" style="background:#e94560; color:white;">Clear All PTO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- My Life Calendar Modal -->
+    <div class="modal-overlay" id="myLifeModal" onclick="hideMyLifeModal()">
+        <div class="modal" style="max-width:900px; max-height:85vh;" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="hideMyLifeModal()">Close</button>
+            <h3>💝 My Life Calendar</h3>
+            <p style="color:#888; font-size:12px; margin-bottom:15px;">
+                Add your important dates and instantly see which lines work best for YOUR life.
+            </p>
+
+            <!-- Add Date Section -->
+            <div style="background:#0f3460; padding:15px; border-radius:8px; margin-bottom:15px;">
+                <h4 style="color:#ec4899; margin-bottom:10px;">Add Important Date</h4>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                    <div>
+                        <label style="color:#888; font-size:11px; display:block; margin-bottom:5px;">Date:</label>
+                        <input type="date" id="myLifeDate"
+                            style="padding:8px; border-radius:5px; background:#16213e; color:#fff; border:1px solid #ec4899;">
+                    </div>
+                    <div style="flex:1; min-width:150px;">
+                        <label style="color:#888; font-size:11px; display:block; margin-bottom:5px;">What's happening:</label>
+                        <input type="text" id="myLifeLabel" placeholder="e.g., Son's graduation, Wedding, Cruise..."
+                            style="padding:8px; border-radius:5px; background:#16213e; color:#fff; border:1px solid #ec4899; width:100%;">
+                    </div>
+                    <div>
+                        <label style="color:#888; font-size:11px; display:block; margin-bottom:5px;">Priority:</label>
+                        <select id="myLifePriority" style="padding:8px; border-radius:5px; background:#16213e; color:#fff; border:1px solid #ec4899;">
+                            <option value="must">Must Have Off</option>
+                            <option value="prefer">Prefer Off</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="addMyLifeDate()" style="background:#ec4899; color:white;">+ Add</button>
+                </div>
+            </div>
+
+            <!-- Date Range Section -->
+            <div style="background:#0f3460; padding:15px; border-radius:8px; margin-bottom:15px;">
+                <h4 style="color:#ec4899; margin-bottom:10px;">Add Date Range (Vacation, Trip, etc.)</h4>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                    <div>
+                        <label style="color:#888; font-size:11px; display:block; margin-bottom:5px;">Start:</label>
+                        <input type="date" id="myLifeRangeStart"
+                            style="padding:8px; border-radius:5px; background:#16213e; color:#fff; border:1px solid #ec4899;">
+                    </div>
+                    <div>
+                        <label style="color:#888; font-size:11px; display:block; margin-bottom:5px;">End:</label>
+                        <input type="date" id="myLifeRangeEnd"
+                            style="padding:8px; border-radius:5px; background:#16213e; color:#fff; border:1px solid #ec4899;">
+                    </div>
+                    <div style="flex:1; min-width:150px;">
+                        <label style="color:#888; font-size:11px; display:block; margin-bottom:5px;">What's happening:</label>
+                        <input type="text" id="myLifeRangeLabel" placeholder="e.g., Caribbean Cruise, Europe Trip..."
+                            style="padding:8px; border-radius:5px; background:#16213e; color:#fff; border:1px solid #ec4899; width:100%;">
+                    </div>
+                    <button class="btn" onclick="addMyLifeDateRange()" style="background:#ec4899; color:white;">+ Add Range</button>
+                </div>
+            </div>
+
+            <!-- Saved Dates List -->
+            <div style="background:#0f3460; padding:15px; border-radius:8px; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="color:#ec4899; margin:0;">Your Important Dates</h4>
+                    <button class="btn" onclick="clearAllMyLifeDates()" style="background:#e94560; color:white; padding:5px 10px; font-size:11px;">Clear All</button>
+                </div>
+                <div id="myLifeDatesList" style="max-height:150px; overflow-y:auto;">
+                    <p style="color:#888; font-size:12px;">No important dates added yet. Add dates above to find your perfect line!</p>
+                </div>
+            </div>
+
+            <!-- Analysis Button -->
+            <div style="text-align:center; margin-bottom:15px;">
+                <button class="btn" onclick="analyzeMyLifeLines()" style="background:#10b981; color:white; padding:12px 30px; font-size:16px; font-weight:bold;">
+                    🔍 Find My Perfect Lines
+                </button>
+            </div>
+
+            <!-- Results Section -->
+            <div id="myLifeResults" style="display:none;">
+                <div style="background:#0f3460; padding:15px; border-radius:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h4 style="color:#10b981; margin:0;">📊 Line Compatibility Results</h4>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <label style="color:#888; font-size:12px;">
+                                <input type="checkbox" id="myLifeShowPerfectOnly" onchange="filterMyLifeResults()">
+                                Show only perfect matches
+                            </label>
+                            <label style="color:#888; font-size:12px;">
+                                <input type="checkbox" id="myLifeShowFavoritesFirst" onchange="filterMyLifeResults()">
+                                Favorites first
+                            </label>
+                        </div>
+                    </div>
+                    <div id="myLifeResultsList" style="max-height:300px; overflow-y:auto;">
+                    </div>
                 </div>
             </div>
         </div>

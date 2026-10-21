@@ -5635,6 +5635,356 @@ function clearComparisonLine() {
     }
 
     // ===========================================
+    // MY LIFE CALENDAR FUNCTIONS
+    // ===========================================
+
+    const MY_LIFE_STORAGE_KEY = 'polishBidMyLife';
+
+    function loadMyLifeDates() {
+        try {
+            const stored = localStorage.getItem(MY_LIFE_STORAGE_KEY);
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveMyLifeDates(dates) {
+        try {
+            localStorage.setItem(MY_LIFE_STORAGE_KEY, JSON.stringify(dates));
+        } catch (e) {
+            console.error('Error saving My Life dates:', e);
+        }
+    }
+
+    function showMyLifeModal() {
+        document.getElementById('myLifeModal').classList.add('show');
+        updateMyLifeDateBounds();
+        renderMyLifeList();
+    }
+
+    function hideMyLifeModal() {
+        document.getElementById('myLifeModal').classList.remove('show');
+    }
+
+    function updateMyLifeDateBounds() {
+        const bidYear = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : 2026;
+        const minDate = `${bidYear}-04-01`;
+        const maxDate = `${bidYear + 1}-03-31`;
+
+        const dateInputs = ['myLifeDate', 'myLifeRangeStart', 'myLifeRangeEnd'];
+        dateInputs.forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.min = minDate;
+                input.max = maxDate;
+            }
+        });
+    }
+
+    function addMyLifeDate() {
+        const dateInput = document.getElementById('myLifeDate');
+        const labelInput = document.getElementById('myLifeLabel');
+        const priorityInput = document.getElementById('myLifePriority');
+
+        if (!dateInput.value) {
+            alert('Please select a date');
+            return;
+        }
+
+        const dates = loadMyLifeDates();
+        dates.push({
+            type: 'single',
+            date: dateInput.value,
+            label: labelInput.value || 'Important Date',
+            priority: priorityInput.value
+        });
+
+        saveMyLifeDates(dates);
+        renderMyLifeList();
+
+        // Clear inputs
+        dateInput.value = '';
+        labelInput.value = '';
+        priorityInput.value = 'must';
+    }
+
+    function addMyLifeDateRange() {
+        const startInput = document.getElementById('myLifeRangeStart');
+        const endInput = document.getElementById('myLifeRangeEnd');
+        const labelInput = document.getElementById('myLifeRangeLabel');
+
+        if (!startInput.value || !endInput.value) {
+            alert('Please select both start and end dates');
+            return;
+        }
+
+        if (new Date(endInput.value) < new Date(startInput.value)) {
+            alert('End date must be after start date');
+            return;
+        }
+
+        const dates = loadMyLifeDates();
+        dates.push({
+            type: 'range',
+            start: startInput.value,
+            end: endInput.value,
+            label: labelInput.value || 'Date Range',
+            priority: 'must' // Ranges are always "must have off"
+        });
+
+        saveMyLifeDates(dates);
+        renderMyLifeList();
+
+        // Clear inputs
+        startInput.value = '';
+        endInput.value = '';
+        labelInput.value = '';
+    }
+
+    function removeMyLifeDate(index) {
+        const dates = loadMyLifeDates();
+        dates.splice(index, 1);
+        saveMyLifeDates(dates);
+        renderMyLifeList();
+    }
+
+    function clearAllMyLifeDates() {
+        if (confirm('Are you sure you want to clear all your important dates?')) {
+            saveMyLifeDates([]);
+            renderMyLifeList();
+            document.getElementById('myLifeResults').style.display = 'none';
+        }
+    }
+
+    function renderMyLifeList() {
+        const container = document.getElementById('myLifeDatesList');
+        const dates = loadMyLifeDates();
+
+        if (dates.length === 0) {
+            container.innerHTML = '<p style="color:#888; font-size:12px;">No important dates added yet. Add dates above to find your perfect line!</p>';
+            return;
+        }
+
+        let html = '<div style="display:flex; flex-direction:column; gap:8px;">';
+
+        dates.forEach((item, index) => {
+            const priorityBadge = item.priority === 'must'
+                ? '<span style="background:#e94560; color:white; padding:2px 6px; border-radius:3px; font-size:10px; margin-left:8px;">MUST</span>'
+                : '<span style="background:#f0a500; color:#1a1a2e; padding:2px 6px; border-radius:3px; font-size:10px; margin-left:8px;">PREFER</span>';
+
+            let dateDisplay;
+            if (item.type === 'range') {
+                dateDisplay = `${formatMyLifeDate(item.start)} - ${formatMyLifeDate(item.end)}`;
+            } else {
+                dateDisplay = formatMyLifeDate(item.date);
+            }
+
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#16213e; padding:8px 12px; border-radius:5px;">
+                    <div>
+                        <span style="color:#ec4899; font-weight:bold;">${dateDisplay}</span>
+                        ${priorityBadge}
+                        <span style="color:#ccc; margin-left:10px;">${item.label}</span>
+                    </div>
+                    <button onclick="removeMyLifeDate(${index})" style="background:#e94560; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:11px;">Remove</button>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function formatMyLifeDate(dateStr) {
+        const date = new Date(dateStr + 'T00:00:00');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    }
+
+    function analyzeMyLifeLines() {
+        const dates = loadMyLifeDates();
+
+        if (dates.length === 0) {
+            alert('Please add at least one important date first!');
+            return;
+        }
+
+        // Build list of all dates to check
+        const checkDates = [];
+        dates.forEach(item => {
+            if (item.type === 'range') {
+                let current = new Date(item.start + 'T00:00:00');
+                const end = new Date(item.end + 'T00:00:00');
+                while (current <= end) {
+                    checkDates.push({
+                        dateStr: `${current.getFullYear()}-${current.getMonth() + 1}-${current.getDate()}`,
+                        label: item.label,
+                        priority: item.priority
+                    });
+                    current.setDate(current.getDate() + 1);
+                }
+            } else {
+                const d = new Date(item.date + 'T00:00:00');
+                checkDates.push({
+                    dateStr: `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
+                    label: item.label,
+                    priority: item.priority
+                });
+            }
+        });
+
+        // Analyze each line
+        const results = [];
+        const favorites = loadFavorites();
+
+        ANNUAL_BID.forEach(line => {
+            const lineNbr = line.lineNbr;
+            const calendar = ALL_LINES_CALENDAR[lineNbr];
+            if (!calendar) return;
+
+            let daysOff = 0;
+            let daysWorking = 0;
+            let mustConflicts = [];
+            let preferConflicts = [];
+
+            checkDates.forEach(check => {
+                const dayData = calendar.days[check.dateStr];
+                if (dayData) {
+                    const isOff = dayData.s === '--' || dayData.s === '-' || !dayData.s;
+                    if (isOff) {
+                        daysOff++;
+                    } else {
+                        daysWorking++;
+                        if (check.priority === 'must') {
+                            mustConflicts.push({ date: check.dateStr, label: check.label, shift: dayData.s });
+                        } else {
+                            preferConflicts.push({ date: check.dateStr, label: check.label, shift: dayData.s });
+                        }
+                    }
+                }
+            });
+
+            const totalDays = daysOff + daysWorking;
+            const score = totalDays > 0 ? Math.round((daysOff / totalDays) * 100) : 0;
+            const isPerfect = mustConflicts.length === 0;
+
+            results.push({
+                lineNbr,
+                displayNum: line.lineNumber || lineNbr.split('-')[0],
+                lineType: line.lineDesc,
+                score,
+                daysOff,
+                daysWorking,
+                mustConflicts,
+                preferConflicts,
+                isPerfect,
+                isFavorite: favorites.includes(lineNbr)
+            });
+        });
+
+        // Sort by score (highest first), then by must conflicts (lowest first)
+        results.sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            return a.mustConflicts.length - b.mustConflicts.length;
+        });
+
+        // Store results for filtering
+        window.myLifeResults = results;
+
+        // Display results
+        displayMyLifeResults(results);
+    }
+
+    function displayMyLifeResults(results) {
+        const container = document.getElementById('myLifeResultsList');
+        const showPerfectOnly = document.getElementById('myLifeShowPerfectOnly').checked;
+        const showFavoritesFirst = document.getElementById('myLifeShowFavoritesFirst').checked;
+
+        let filtered = results;
+
+        if (showPerfectOnly) {
+            filtered = results.filter(r => r.isPerfect);
+        }
+
+        if (showFavoritesFirst) {
+            filtered.sort((a, b) => {
+                if (a.isFavorite && !b.isFavorite) return -1;
+                if (!a.isFavorite && b.isFavorite) return 1;
+                return b.score - a.score;
+            });
+        }
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<p style="color:#888; text-align:center; padding:20px;">No lines match your criteria. Try unchecking "Show only perfect matches".</p>';
+            document.getElementById('myLifeResults').style.display = 'block';
+            return;
+        }
+
+        // Count perfect matches
+        const perfectCount = results.filter(r => r.isPerfect).length;
+
+        let html = `<div style="margin-bottom:10px; color:#10b981; font-size:14px;">
+            Found <strong>${perfectCount}</strong> perfect matches out of ${results.length} lines
+        </div>`;
+
+        html += '<div style="display:flex; flex-direction:column; gap:6px;">';
+
+        filtered.forEach(result => {
+            const scoreColor = result.score >= 100 ? '#10b981' :
+                              result.score >= 80 ? '#4ecca3' :
+                              result.score >= 50 ? '#f0a500' : '#e94560';
+
+            const favStar = result.isFavorite ? '<span style="color:#f0a500; margin-right:5px;">★</span>' : '';
+
+            let conflictInfo = '';
+            if (result.mustConflicts.length > 0) {
+                conflictInfo = `<span style="color:#e94560; font-size:11px; margin-left:10px;">
+                    ⚠️ ${result.mustConflicts.length} conflict${result.mustConflicts.length > 1 ? 's' : ''}:
+                    ${result.mustConflicts.slice(0, 3).map(c => c.label).join(', ')}${result.mustConflicts.length > 3 ? '...' : ''}
+                </span>`;
+            }
+
+            const perfectBadge = result.isPerfect
+                ? '<span style="background:#10b981; color:white; padding:2px 8px; border-radius:10px; font-size:10px; margin-left:8px;">PERFECT MATCH</span>'
+                : '';
+
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#16213e; padding:10px 15px; border-radius:5px; border-left:4px solid ${scoreColor};">
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <div style="text-align:center; min-width:50px;">
+                            <div style="font-size:24px; font-weight:bold; color:${scoreColor};">${result.score}%</div>
+                            <div style="font-size:10px; color:#888;">match</div>
+                        </div>
+                        <div>
+                            <span style="font-weight:bold; color:#fff; cursor:pointer;" onclick="showCalendar('${result.lineNbr}'); hideMyLifeModal();">
+                                ${favStar}Line ${result.displayNum} (${result.lineType})
+                            </span>
+                            ${perfectBadge}
+                            ${conflictInfo}
+                        </div>
+                    </div>
+                    <div style="text-align:right; font-size:12px;">
+                        <div style="color:#10b981;">${result.daysOff} days off</div>
+                        <div style="color:#e94560;">${result.daysWorking} working</div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+        document.getElementById('myLifeResults').style.display = 'block';
+    }
+
+    function filterMyLifeResults() {
+        if (window.myLifeResults) {
+            displayMyLifeResults(window.myLifeResults);
+        }
+    }
+
+    // ===========================================
     // AUDIT LOG FUNCTIONS
     // ===========================================
     
@@ -8752,6 +9102,16 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.closeDeskMoveMenu = closeDeskMoveMenu;
     window.moveDeskToGroup = moveDeskToGroup;
     window.openYearTimeline = openYearTimeline;
+
+    // My Life Calendar functions
+    window.showMyLifeModal = showMyLifeModal;
+    window.hideMyLifeModal = hideMyLifeModal;
+    window.addMyLifeDate = addMyLifeDate;
+    window.addMyLifeDateRange = addMyLifeDateRange;
+    window.removeMyLifeDate = removeMyLifeDate;
+    window.clearAllMyLifeDates = clearAllMyLifeDates;
+    window.analyzeMyLifeLines = analyzeMyLifeLines;
+    window.filterMyLifeResults = filterMyLifeResults;
 
     // Change a desk's group assignment
     async function changeDeskAssignment(desk, newGroup) {
