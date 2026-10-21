@@ -3331,8 +3331,10 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .drag-palette { display: flex; gap: 8px; justify-content: flex-start; margin: 8px 0; padding: 8px 10px; background: #f0f0f0; border-radius: 8px; align-items: center; }
 .instructions { background: #e8f4fc; border: 1px solid #0066cc; border-radius: 8px; padding: 10px 15px; margin: 10px 0; font-size: 11px; color: #333; }
 .instructions b { color: #0066cc; }
-.drag-item { padding: 8px 16px; border-radius: 4px; cursor: grab; font-weight: bold; font-size: 12px; border: 2px solid #333; user-select: none; }
+.drag-item { padding: 8px 16px; border-radius: 4px; cursor: grab; font-weight: bold; font-size: 12px; border: 2px solid #333; user-select: none; transition: all 0.15s ease; }
 .drag-item:active { cursor: grabbing; }
+.drag-item.sticky-selected { outline: 3px solid #ff0000; box-shadow: 0 0 12px rgba(255,0,0,0.6); transform: scale(1.05); cursor: pointer; }
+.shift-cell.range-selected { outline: 3px dashed #9b59b6 !important; background: rgba(155,89,182,0.3) !important; }
 .drag-item.vac { background: #FF69B4; color: #000; }
 .drag-item.hol { background: #FFD700; color: #000; }
 .drag-item.ppt { background: #9370DB; color: #fff; }
@@ -3505,6 +3507,11 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <b>Receive shift:</b> Load a comparison line (orange), then drag THEIR shift to YOUR cell = auto-swap.
         <b>Give shift:</b> Click "Give Shift Mode" button, double-click YOUR cell (red border), click THEIR cell = you give it up.
         <b>UNDO/REDO/RESET</b> for changes. <b>Ctrl+S</b> to download.
+    </div>
+    <div id="stickyModeBar" class="no-print" style="display:none; background:#ffe4e1; border:2px solid #e74c3c; border-radius:6px; padding:10px 15px; margin:5px 0; font-size:12px;">
+        <b style="color:#c0392b;">🎯 QUICK APPLY MODE:</b> <span id="stickyShiftName" style="background:#ff69b4; padding:2px 8px; border-radius:4px; font-weight:bold;"></span> selected.
+        <b>Click</b> any cell to apply. <b>Shift+Click</b> to select a range.
+        Press <b>ESC</b> or click the shift again to exit.
     </div>
     <div class="no-print" style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
         <b>SAVE REMINDER:</b> Press <b>Ctrl+S</b> to save this file to your <b>Downloads</b> folder.
@@ -3962,7 +3969,167 @@ for (var di = 0; di < dragItems.length; di++) {
         draggedType = this.getAttribute('data-type') || 'timeoff';
         e.dataTransfer.effectAllowed = 'copy';
     });
+
+    // Click handler for sticky/quick-apply mode
+    dragItems[di].addEventListener('click', function(e) {
+        e.preventDefault();
+        toggleStickyMode(this);
+    });
 }
+
+// Sticky mode variables
+var stickyShift = null;
+var stickyType = null;
+var stickyElement = null;
+var lastClickedCell = null;
+
+function toggleStickyMode(element) {
+    var value = element.getAttribute('data-value');
+    var type = element.getAttribute('data-type') || 'timeoff';
+
+    // If clicking the same item, deactivate
+    if (stickyElement === element) {
+        exitStickyMode();
+        return;
+    }
+
+    // Deactivate previous if any
+    if (stickyElement) {
+        stickyElement.classList.remove('sticky-selected');
+    }
+
+    // Activate this one
+    stickyShift = value;
+    stickyType = type;
+    stickyElement = element;
+    lastClickedCell = null;
+    element.classList.add('sticky-selected');
+
+    // Show instruction bar
+    var bar = document.getElementById('stickyModeBar');
+    var nameSpan = document.getElementById('stickyShiftName');
+    if (bar && nameSpan) {
+        nameSpan.textContent = value;
+        bar.style.display = 'block';
+    }
+
+    // Clear any range selection
+    clearRangeSelection();
+}
+
+function exitStickyMode() {
+    if (stickyElement) {
+        stickyElement.classList.remove('sticky-selected');
+    }
+    stickyShift = null;
+    stickyType = null;
+    stickyElement = null;
+    lastClickedCell = null;
+
+    var bar = document.getElementById('stickyModeBar');
+    if (bar) bar.style.display = 'none';
+
+    clearRangeSelection();
+}
+
+function clearRangeSelection() {
+    var selected = document.querySelectorAll('.shift-cell.range-selected');
+    for (var i = 0; i < selected.length; i++) {
+        selected[i].classList.remove('range-selected');
+    }
+}
+
+function applyStickyShiftToCell(cell) {
+    if (!stickyShift) return;
+
+    saveToUndo();
+
+    // Apply the sticky shift based on type
+    if (stickyType === 'shift') {
+        // Work shift - ask about type
+        var shiftChoice = prompt('Is this shift a:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
+
+        if (shiftChoice === '2') {
+            cell.textContent = 'SW-' + stickyShift;
+        } else if (shiftChoice === '3') {
+            cell.textContent = 'OT-' + stickyShift;
+        } else if (shiftChoice === '4') {
+            cell.textContent = 'DT-' + stickyShift;
+        } else {
+            cell.textContent = stickyShift;
+        }
+    } else if (stickyType === 'compwork') {
+        showDeskPopup(cell);
+        return;
+    } else if (stickyType === 'special') {
+        var specChoice = prompt(stickyShift + ' - Is this:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
+        if (specChoice === '1') {
+            cell.textContent = 'C-' + stickyShift;
+        } else if (specChoice === '2') {
+            cell.textContent = 'OT-' + stickyShift;
+        } else {
+            cell.textContent = stickyShift;
+        }
+    } else {
+        // Time off - apply directly
+        cell.textContent = stickyShift;
+    }
+
+    updateCellColor(cell);
+}
+
+function applyStickyToRange(startCell, endCell) {
+    // Get all shift cells in order
+    var allCells = Array.from(document.querySelectorAll('.shift-cell'));
+    var startIdx = allCells.indexOf(startCell);
+    var endIdx = allCells.indexOf(endCell);
+
+    if (startIdx === -1 || endIdx === -1) return;
+
+    // Ensure start < end
+    if (startIdx > endIdx) {
+        var temp = startIdx;
+        startIdx = endIdx;
+        endIdx = temp;
+    }
+
+    saveToUndo();
+
+    // For time off items, apply directly to all cells without prompts
+    if (stickyType === 'timeoff') {
+        for (var i = startIdx; i <= endIdx; i++) {
+            allCells[i].textContent = stickyShift;
+            updateCellColor(allCells[i]);
+        }
+    } else {
+        // For shifts, prompt once and apply to all
+        var prefix = '';
+        if (stickyType === 'shift') {
+            var shiftChoice = prompt('Apply ' + stickyShift + ' to ' + (endIdx - startIdx + 1) + ' cells as:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
+            if (shiftChoice === '2') prefix = 'SW-';
+            else if (shiftChoice === '3') prefix = 'OT-';
+            else if (shiftChoice === '4') prefix = 'DT-';
+        } else if (stickyType === 'special') {
+            var specChoice = prompt('Apply ' + stickyShift + ' to ' + (endIdx - startIdx + 1) + ' cells as:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
+            if (specChoice === '1') prefix = 'C-';
+            else if (specChoice === '2') prefix = 'OT-';
+        }
+
+        for (var j = startIdx; j <= endIdx; j++) {
+            allCells[j].textContent = prefix + stickyShift;
+            updateCellColor(allCells[j]);
+        }
+    }
+
+    clearRangeSelection();
+}
+
+// Escape key to exit sticky mode
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && stickyShift) {
+        exitStickyMode();
+    }
+});
 
 var shiftCells = document.querySelectorAll('.shift-cell');
 for (var sc = 0; sc < shiftCells.length; sc++) {
@@ -3972,8 +4139,52 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
         selectMainCellForSwap(this);
     });
 
-    // Mousedown - only interfere with contenteditable in swap mode
+    // Click handler for sticky mode
+    shiftCells[sc].addEventListener('click', function(e) {
+        // Only handle if in sticky mode
+        if (!stickyShift) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Shift+click for range selection
+        if (e.shiftKey && lastClickedCell) {
+            // Select range
+            var allCells = Array.from(document.querySelectorAll('.shift-cell'));
+            var startIdx = allCells.indexOf(lastClickedCell);
+            var endIdx = allCells.indexOf(this);
+
+            if (startIdx > endIdx) {
+                var temp = startIdx;
+                startIdx = endIdx;
+                endIdx = temp;
+            }
+
+            // Highlight range
+            clearRangeSelection();
+            for (var r = startIdx; r <= endIdx; r++) {
+                allCells[r].classList.add('range-selected');
+            }
+
+            // Apply to range
+            applyStickyToRange(lastClickedCell, this);
+            lastClickedCell = null;
+        } else {
+            // Single click - apply to this cell
+            clearRangeSelection();
+            applyStickyShiftToCell(this);
+            lastClickedCell = this;
+        }
+    });
+
+    // Mousedown - only interfere with contenteditable in swap mode or sticky mode
     shiftCells[sc].addEventListener('mousedown', function(e) {
+        // In sticky mode, prevent contenteditable from activating
+        if (stickyShift) {
+            e.preventDefault();
+            return;
+        }
+
         // In edit mode, let contenteditable work normally
         if (!swapMode) return;
 
