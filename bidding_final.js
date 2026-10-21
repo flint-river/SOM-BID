@@ -6477,145 +6477,148 @@ window.addEventListener('DOMContentLoaded', function() {
 
     function hideYourEditPicker() {
         document.getElementById('yourEditPickerModal').style.display = 'none';
-        // Also close the dropdown
-        const opts = document.getElementById('yourEditLineDropdownOptions');
-        if (opts) opts.classList.remove('show');
+        // Clear search input
+        const searchInput = document.getElementById('lineSearchInput');
+        if (searchInput) searchInput.value = '';
     }
 
-    function toggleYourEditLineDropdown() {
-        const opts = document.getElementById('yourEditLineDropdownOptions');
-        if (opts) opts.classList.toggle('show');
-    }
-
-    function selectYourEditLine(lineNbr) {
-        const hiddenInput = document.getElementById('yourEditLinePicker');
-        const dropdownText = document.getElementById('yourEditLineDropdownText');
-        const opts = document.getElementById('yourEditLineDropdownOptions');
-
-        if (hiddenInput) hiddenInput.value = lineNbr;
-
-        // Update display text
-        if (dropdownText) {
-            const lineData = ANNUAL_BID.find(l => l.lineNbr === lineNbr);
-            if (lineData) {
-                const parts = lineNbr.split('-');
-                const displayNum = parts[0];
-                const lineType = parts.length > 1 ? parts[1] : '';
-                dropdownText.textContent = `Line ${displayNum} (${lineType})`;
-            }
-        }
-
-        // Close dropdown
-        if (opts) opts.classList.remove('show');
+    function selectAndLaunchYourEdit(lineNbr) {
+        // Close the modal and launch directly
+        hideYourEditPicker();
+        exportYearOverviewHTML(lineNbr);
     }
 
     function populateYourEditLinePicker() {
-        const optionsDiv = document.getElementById('yourEditLineDropdownOptions');
-        if (!optionsDiv) return;
+        const container = document.getElementById('lineCardsContainer');
+        if (!container) return;
 
-        // Clear existing options
-        optionsDiv.innerHTML = '';
+        // Clear existing cards
+        container.innerHTML = '';
 
         // Get favorites
         const favorites = loadFavorites();
 
-        // Helper to render pattern preview HTML
-        function renderPatternPreview(lineData) {
-            let html = '<div class="pattern-preview">';
+        // Helper to create a line card
+        function createLineCard(lineData, isFavorite) {
+            const parts = lineData.lineNbr.split('-');
+            const displayNum = parts[0];
+            const lineType = parts.length > 1 ? parts[1] : 'SOM';
+
+            const card = document.createElement('div');
+            card.className = 'line-card' + (isFavorite ? ' favorite' : '');
+            card.setAttribute('data-line', lineData.lineNbr);
+            card.setAttribute('data-search', (lineData.lineNbr + ' ' + lineType + ' Line ' + displayNum).toLowerCase());
+            card.onclick = function() { selectAndLaunchYourEdit(lineData.lineNbr); };
+
+            // Build pattern HTML
+            let patternHtml = '<div class="pattern-row">';
             for (let i = 0; i < 12; i++) {
                 const shift = lineData.days[i];
                 const isOff = shift === '--';
                 const bgColor = isOff ? '#22c55e' : '#f97316';
-                const textColor = '#fff';
-                html += '<div class="pattern-day" style="background:' + bgColor + ';color:' + textColor + ';">' + shift + '</div>';
+                patternHtml += '<div class="pattern-cell" style="background:' + bgColor + ';color:#fff;">' + shift + '</div>';
             }
-            html += '</div>';
-            return html;
+            patternHtml += '</div>';
+
+            card.innerHTML =
+                '<div class="card-header">' +
+                    '<span class="line-name">' + (isFavorite ? '★ ' : '') + 'Line ' + displayNum + '</span>' +
+                    '<span class="line-type ' + lineType.toLowerCase() + '">' + lineType + '</span>' +
+                '</div>' +
+                patternHtml;
+
+            return card;
         }
 
-        // Add favorited lines first
+        // Add favorites section
         if (favorites.length > 0) {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'line-dropdown-group';
-            groupDiv.textContent = '★ Favorites';
-            optionsDiv.appendChild(groupDiv);
+            const favHeader = document.createElement('div');
+            favHeader.className = 'line-cards-section-header';
+            favHeader.textContent = '★ Favorites';
+            favHeader.style.gridColumn = '1 / -1';
+            container.appendChild(favHeader);
 
             favorites.forEach(lineNbr => {
                 const lineData = ANNUAL_BID.find(l => l.lineNbr === lineNbr);
                 if (lineData) {
-                    const parts = lineNbr.split('-');
-                    const displayNum = parts[0];
-                    const lineType = parts.length > 1 ? parts[1] : '';
-
-                    const optDiv = document.createElement('div');
-                    optDiv.className = 'line-dropdown-option';
-                    optDiv.onclick = function() { selectYourEditLine(lineNbr); };
-                    optDiv.innerHTML = '<div class="line-name">★ Line ' + displayNum + ' (' + lineType + ')</div>' + renderPatternPreview(lineData);
-                    optionsDiv.appendChild(optDiv);
+                    container.appendChild(createLineCard(lineData, true));
                 }
             });
         }
 
-        // Add all lines grouped by type
+        // Add SSOM section
         const ssomLines = ANNUAL_BID.filter(l => l.lineNbr.includes('-SSOM'));
-        const somLines = ANNUAL_BID.filter(l => l.lineNbr.includes('-SOM') && !l.lineNbr.includes('-SSOM'));
-
         if (ssomLines.length > 0) {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'line-dropdown-group';
-            groupDiv.textContent = 'SSOM Lines';
-            optionsDiv.appendChild(groupDiv);
+            const ssomHeader = document.createElement('div');
+            ssomHeader.className = 'line-cards-section-header';
+            ssomHeader.textContent = 'SSOM Lines (' + ssomLines.length + ')';
+            ssomHeader.style.gridColumn = '1 / -1';
+            container.appendChild(ssomHeader);
 
             ssomLines.forEach(line => {
-                const parts = line.lineNbr.split('-');
-                const displayNum = parts[0];
                 const isFav = favorites.includes(line.lineNbr);
-
-                const optDiv = document.createElement('div');
-                optDiv.className = 'line-dropdown-option';
-                optDiv.onclick = function() { selectYourEditLine(line.lineNbr); };
-                optDiv.innerHTML = '<div class="line-name">' + (isFav ? '★ ' : '') + 'Line ' + displayNum + ' (SSOM)</div>' + renderPatternPreview(line);
-                optionsDiv.appendChild(optDiv);
+                container.appendChild(createLineCard(line, isFav));
             });
         }
 
+        // Add SOM section
+        const somLines = ANNUAL_BID.filter(l => l.lineNbr.includes('-SOM') && !l.lineNbr.includes('-SSOM'));
         if (somLines.length > 0) {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'line-dropdown-group';
-            groupDiv.textContent = 'SOM Lines';
-            optionsDiv.appendChild(groupDiv);
+            const somHeader = document.createElement('div');
+            somHeader.className = 'line-cards-section-header';
+            somHeader.textContent = 'SOM Lines (' + somLines.length + ')';
+            somHeader.style.gridColumn = '1 / -1';
+            container.appendChild(somHeader);
 
             somLines.forEach(line => {
-                const parts = line.lineNbr.split('-');
-                const displayNum = parts[0];
                 const isFav = favorites.includes(line.lineNbr);
-
-                const optDiv = document.createElement('div');
-                optDiv.className = 'line-dropdown-option';
-                optDiv.onclick = function() { selectYourEditLine(line.lineNbr); };
-                optDiv.innerHTML = '<div class="line-name">' + (isFav ? '★ ' : '') + 'Line ' + displayNum + ' (SOM)</div>' + renderPatternPreview(line);
-                optionsDiv.appendChild(optDiv);
+                container.appendChild(createLineCard(line, isFav));
             });
         }
-
-        // Reset selection state
-        document.getElementById('yourEditLinePicker').value = '';
-        document.getElementById('yourEditLineDropdownText').textContent = '-- Choose a line --';
     }
 
-    function launchYourEdit() {
-        const select = document.getElementById('yourEditLinePicker');
-        const lineNbr = select.value;
+    function filterLineCards() {
+        const searchInput = document.getElementById('lineSearchInput');
+        const container = document.getElementById('lineCardsContainer');
+        if (!searchInput || !container) return;
 
-        if (!lineNbr) {
-            alert('Please select a line first.');
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const cards = container.querySelectorAll('.line-card');
+        const headers = container.querySelectorAll('.line-cards-section-header');
+
+        if (!searchTerm) {
+            // Show all cards and headers
+            cards.forEach(card => card.style.display = '');
+            headers.forEach(header => header.style.display = '');
             return;
         }
 
-        // Close the modal
-        hideYourEditPicker();
+        // Hide all headers when filtering
+        headers.forEach(header => header.style.display = 'none');
 
-        // Open Your Edit with the selected line
+        // Filter cards
+        cards.forEach(card => {
+            const searchData = card.getAttribute('data-search') || '';
+            const lineNbr = card.getAttribute('data-line') || '';
+            if (searchData.includes(searchTerm) || lineNbr.toLowerCase().includes(searchTerm)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    // Keep launchYourEdit for compatibility but it's not used with cards
+    function launchYourEdit() {
+        const select = document.getElementById('yourEditLinePicker');
+        const lineNbr = select ? select.value : '';
+
+        if (!lineNbr) {
+            alert('Please click on a line card to select it.');
+            return;
+        }
+
+        hideYourEditPicker();
         exportYearOverviewHTML(lineNbr);
     }
 
@@ -9754,8 +9757,8 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.openYourEditStandalone = openYourEditStandalone;
     window.hideYourEditPicker = hideYourEditPicker;
     window.launchYourEdit = launchYourEdit;
-    window.toggleYourEditLineDropdown = toggleYourEditLineDropdown;
-    window.selectYourEditLine = selectYourEditLine;
+    window.selectAndLaunchYourEdit = selectAndLaunchYourEdit;
+    window.filterLineCards = filterLineCards;
 
     // Change a desk's group assignment
     async function changeDeskAssignment(desk, newGroup) {

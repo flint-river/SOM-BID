@@ -1381,3 +1381,74 @@
             font-size: 8px;
             font-weight: bold;
         }
+
+        /* Line Card Grid Styles */
+        .line-card {
+            background: #16213e;
+            border: 2px solid #0f3460;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .line-card:hover {
+            border-color: #6d28d9;
+            background: #1a2744;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(109, 40, 217, 0.3);
+        }
+        .line-card.favorite {
+            border-color: #f0a500;
+        }
+        .line-card .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .line-card .line-name {
+            font-weight: bold;
+            font-size: 16px;
+            color: #fff;
+        }
+        .line-card .line-type {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .line-card .line-type.ssom {
+            background: #e94560;
+            color: #fff;
+        }
+        .line-card .line-type.som {
+            background: #4ecca3;
+            color: #1a1a2e;
+        }
+        .line-card .pattern-row {
+            display: flex;
+            gap: 3px;
+            flex-wrap: wrap;
+        }
+        .line-card .pattern-cell {
+            width: 28px;
+            height: 22px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .line-cards-section {
+            margin-bottom: 10px;
+        }
+        .line-cards-section-header {
+            font-size: 13px;
+            font-weight: bold;
+            color: #4ecca3;
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            background: #0f3460;
+            border-radius: 6px;
+        }
