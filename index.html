@@ -46,15 +46,36 @@
                 <span class="stat-label">Avail:</span>
                 <span class="stat-value available" id="statAvailSOM">81</span>
             </div>
-            <button class="btn btn-legend" onclick="showLegend()">Legend</button>
-            <button class="btn" onclick="showHolidaySummary()" style="background:#e94560; color:white;">🎄 Holiday Summary</button>
-            <button class="btn" onclick="showSwapCompare()" style="background:#9b59b6; color:white;">🔄 Swap Compare</button>
-            <button class="btn" onclick="toggleFavoritesView()" id="favoritesBtn" style="background:#f0a500; color:#1a1a2e;">⭐ Favorites (<span id="favCount">0</span>)</button>
-            <a href="#" onclick="openYearTimeline(); return false;" class="btn" style="background:#27ae60; color:white; text-decoration:none;">📅 Year Timeline</a>
-            <button class="btn" onclick="showPTOModal()" style="background:#2563eb; color:white;">🏖️ PTO Overlay</button>
-            <button class="btn" onclick="showMyLifeModal()" style="background:#ec4899; color:white;">💝 My Life</button>
-            <a href="swap_builder.html" class="btn" style="background:#9b59b6; color:white; text-decoration:none;">🔄 Swap Builder</a>
-            <button class="btn" onclick="toggleBidHistoryView()" id="bidHistoryBtn" style="background:#ff6b35; color:white;">📜 Bid History</button>
+            <!-- PERSONAL PLANNING GROUP -->
+            <div class="btn-group" style="display:inline-flex; gap:4px; background:rgba(236,72,153,0.15); padding:4px 8px; border-radius:8px; border:1px solid rgba(236,72,153,0.3);">
+                <button class="btn" onclick="showMyLifeModal()" style="background:linear-gradient(135deg,#ec4899,#db2777); color:white; font-weight:bold; box-shadow:0 2px 8px rgba(236,72,153,0.4);">💝 My Life</button>
+                <button class="btn" onclick="showPTOModal()" style="background:#be185d; color:white;">🏖️ PTO</button>
+                <button class="btn" onclick="toggleFavoritesView()" id="favoritesBtn" style="background:#9d174d; color:white;">⭐ <span id="favCount">0</span></button>
+            </div>
+
+            <span style="color:#333; margin:0 2px;">│</span>
+
+            <!-- CALENDAR VIEWS GROUP -->
+            <div class="btn-group" style="display:inline-flex; gap:4px; background:rgba(16,185,129,0.15); padding:4px 8px; border-radius:8px; border:1px solid rgba(16,185,129,0.3);">
+                <a href="#" onclick="openYearTimeline(); return false;" class="btn" style="background:linear-gradient(135deg,#10b981,#059669); color:white; text-decoration:none; font-weight:bold;">📅 Timeline</a>
+                <button class="btn" onclick="showHolidaySummary()" style="background:#047857; color:white;">🎄 Holidays</button>
+            </div>
+
+            <span style="color:#333; margin:0 2px;">│</span>
+
+            <!-- SWAP/COMPARE GROUP -->
+            <div class="btn-group" style="display:inline-flex; gap:4px; background:rgba(139,92,246,0.15); padding:4px 8px; border-radius:8px; border:1px solid rgba(139,92,246,0.3);">
+                <button class="btn" onclick="showSwapCompare()" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white;">🔄 Compare</button>
+                <a href="swap_builder.html" class="btn" style="background:#6d28d9; color:white; text-decoration:none;">🔧 Swap Builder</a>
+            </div>
+
+            <span style="color:#333; margin:0 2px;">│</span>
+
+            <!-- UTILITY GROUP -->
+            <div class="btn-group" style="display:inline-flex; gap:4px;">
+                <button class="btn" onclick="toggleBidHistoryView()" id="bidHistoryBtn" style="background:#475569; color:white;">📜 History</button>
+                <button class="btn btn-legend" onclick="showLegend()" style="background:#334155; color:#94a3b8;">Legend</button>
+            </div>
             <button class="btn" onclick="toggleLiveMode()" id="liveModeBtn" style="display:none; background:#16213e; color:#4ecca3; border:1px solid #4ecca3;">🔴 Live Mode</button>
             <button class="btn" onclick="showEscalationManager()" id="escalationBtn" style="display:none; background:#f39c12; color:#1a1a2e;">🔄 Escalation</button>
             <button class="btn" onclick="showNextYearSetup()" id="nextYearSetupBtn" style="display:none; background:#9b59b6; color:white;">⚙️ Next Year Setup</button>

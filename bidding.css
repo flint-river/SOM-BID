@@ -365,20 +365,38 @@
             flex-shrink: 0;
         }
         .btn {
-            padding: 6px 15px;
+            padding: 6px 12px;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 11px;
-            font-weight: bold;
-            transition: all 0.2s;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .btn:active {
+            transform: translateY(0);
+            filter: brightness(0.95);
         }
         .btn-primary { background: #e94560; color: white; }
         .btn-primary:hover { background: #ff6b6b; }
         .btn-secondary { background: #0f3460; color: #eee; }
         .btn-secondary:hover { background: #2a3f5f; }
-        .btn-legend { background: #4ecca3; color: #1a1a2e; }
+        .btn-legend { background: #334155; color: #94a3b8; }
+        .btn-legend:hover { background: #475569; color: #fff; }
         .btn-admin { background: #f0a500; color: #1a1a2e; }
+
+        /* Button Groups */
+        .btn-group {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+        }
 
         .modal-overlay {
             display: none;
