@@ -3532,6 +3532,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
     </div>
 ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e8e8;">
         <button onclick="undoChange()" class="edit-btn" title="Undo">↩ UNDO <span id="undoCount" style="background:rgba(255,255,255,0.3); padding:1px 5px; border-radius:10px; font-size:9px;">0</span></button>
+        <button onclick="undoAll()" class="edit-btn" title="Undo All Changes" style="background:#c0392b;">↩↩ UNDO ALL</button>
         <button onclick="redoChange()" class="edit-btn" title="Redo">↪ REDO <span id="redoCount" style="background:rgba(255,255,255,0.3); padding:1px 5px; border-radius:10px; font-size:9px;">0</span></button>
         <button onclick="resetToOriginal()" class="edit-btn reset-btn" title="Reset to Original">🔄 RESET</button>
         <button id="swapModeBtn" onclick="toggleSwapMode()" class="edit-btn" style="background:#9b59b6; margin-left:10px;" title="Switch to Give Shift mode to give your shifts to comparison line">🔄 Give Shift Mode</button>
@@ -3694,6 +3695,23 @@ function redoChange() {
     } else {
         alert('Nothing to redo');
     }
+}
+
+function undoAll() {
+    if (undoStack.length === 0) {
+        alert('Nothing to undo');
+        return;
+    }
+    // Save current state to redo
+    redoStack.push(captureState());
+    // Add all intermediate states to redo stack
+    while (undoStack.length > 1) {
+        redoStack.push(undoStack.pop());
+    }
+    // Restore the first state (oldest)
+    var firstState = undoStack.pop();
+    restoreState(firstState);
+    updateUndoRedoCounts();
 }
 
 function resetToOriginal() {
