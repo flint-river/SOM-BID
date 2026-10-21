@@ -204,16 +204,23 @@
             console.log('[BidApp] Applied desk assignments to PatternLoader:', Object.keys(deskAssignments).length, 'desks');
         }
 
-        // Load patterns if not already loaded
+        // Load patterns and cloud data IN PARALLEL for faster startup
+        var patternPromise = null;
+        var cloudPromise = initCloud(); // Start cloud loading immediately
+
         if (typeof PatternLoader !== 'undefined' && (!window.ANNUAL_BID || window.ANNUAL_BID.length === 0)) {
-            try {
-                console.log('[BidApp] Loading patterns...');
-                await PatternLoader.load('patterns.json');
+            console.log('[BidApp] Loading patterns...');
+            patternPromise = PatternLoader.load('patterns.json');
+        }
+
+        // Wait for both to complete
+        try {
+            if (patternPromise) {
+                await patternPromise;
                 ANNUAL_BID = window.ANNUAL_BID;
                 console.log(`[BidApp] Loaded ${ANNUAL_BID.length} lines`);
 
                 // CRITICAL: Regenerate calendar AFTER patterns load
-                // This ensures SEASONAL_DESKS is populated for seasonal desk transformations
                 if (typeof initializeCalendar === 'function') {
                     initializeCalendar();
                     console.log('[BidApp] Calendar regenerated with seasonal desk support');
@@ -221,26 +228,25 @@
                         console.log(`[BidApp] Seasonal desks active: ${window.SEASONAL_DESKS.map(sd => sd.code).join(', ')}`);
                     }
                 }
-            } catch (err) {
-                console.error('[BidApp] Failed to load patterns:', err);
-            }
-        } else if (window.ANNUAL_BID && window.ANNUAL_BID.length > 0) {
-            // Use already-loaded patterns
-            ANNUAL_BID = window.ANNUAL_BID;
-            console.log(`[BidApp] Using pre-loaded ${ANNUAL_BID.length} lines`);
+            } else if (window.ANNUAL_BID && window.ANNUAL_BID.length > 0) {
+                ANNUAL_BID = window.ANNUAL_BID;
+                console.log(`[BidApp] Using pre-loaded ${ANNUAL_BID.length} lines`);
 
-            // Still need to regenerate calendar if SEASONAL_DESKS exists
-            if (typeof initializeCalendar === 'function' && window.SEASONAL_DESKS && window.SEASONAL_DESKS.length > 0) {
-                initializeCalendar();
-                console.log('[BidApp] Calendar regenerated for pre-loaded patterns with seasonal desks');
+                if (typeof initializeCalendar === 'function' && window.SEASONAL_DESKS && window.SEASONAL_DESKS.length > 0) {
+                    initializeCalendar();
+                    console.log('[BidApp] Calendar regenerated for pre-loaded patterns with seasonal desks');
+                }
             }
+        } catch (err) {
+            console.error('[BidApp] Failed to load patterns:', err);
         }
+
+        await cloudPromise; // Wait for cloud data
 
         if (sessionStorage.getItem('polish_bid_admin') === 'true') {
             isAdmin = true;
             enableAdminMode();
         }
-        await initCloud();
         renderAll();
 
         // Update any year-specific text in the UI
@@ -416,8 +422,11 @@
     }
 
     async function initCloud() {
-        await loadSeniorityLists();
-        await loadFromCloud();
+        // Load seniority and bid data in parallel for faster startup
+        await Promise.all([
+            loadSeniorityLists(),
+            loadFromCloud()
+        ]);
     }
 
     async function loadFromCloud() {
