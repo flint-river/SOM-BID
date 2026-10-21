@@ -3508,6 +3508,10 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <b>Give shift:</b> Click "Give Shift Mode" button, double-click YOUR cell (red border), click THEIR cell = you give it up.
         <b>UNDO/REDO/RESET</b> for changes. <b>Ctrl+S</b> to download.
     </div>
+    <div id="quickApplyBar" class="no-print" style="display:none; background:#ffe4e1; border:2px solid #e74c3c; border-radius:6px; padding:10px 15px; margin:5px 0; font-size:12px;">
+        <b style="color:#c0392b;">QUICK APPLY MODE:</b> <span id="quickApplyName" style="background:#ff69b4; padding:2px 8px; border-radius:4px; font-weight:bold;"></span> selected.
+        <b>Click</b> any cell to apply. Press <b>ESC</b> or click the shift again to exit.
+    </div>
     <div class="no-print" style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
         <b>SAVE REMINDER:</b> Press <b>Ctrl+S</b> to save this file to your <b>Downloads</b> folder.
         <span style="color:#c0392b;"><b>VDI Users:</b></span> Downloads folder is cleared when you sign out!
@@ -3975,8 +3979,65 @@ for (var di = 0; di < dragItems.length; di++) {
         draggedType = this.getAttribute('data-type') || 'timeoff';
         e.dataTransfer.effectAllowed = 'copy';
     });
-
+    dragItems[di].addEventListener('click', function() {
+        startQuickApply(this);
+    });
 }
+
+// Quick Apply mode - minimal version
+var quickApplyValue = null;
+var quickApplyType = null;
+var quickApplyElement = null;
+
+function startQuickApply(element) {
+    var value = element.getAttribute('data-value');
+    var type = element.getAttribute('data-type') || 'timeoff';
+
+    // If same element, turn off
+    if (quickApplyElement === element) {
+        stopQuickApply();
+        return;
+    }
+
+    // Turn off previous
+    if (quickApplyElement) {
+        quickApplyElement.style.outline = '';
+        quickApplyElement.style.transform = '';
+    }
+
+    // Activate new
+    quickApplyValue = value;
+    quickApplyType = type;
+    quickApplyElement = element;
+    element.style.outline = '3px solid #e74c3c';
+    element.style.transform = 'scale(1.05)';
+
+    var bar = document.getElementById('quickApplyBar');
+    var nameSpan = document.getElementById('quickApplyName');
+    if (bar) {
+        nameSpan.textContent = value;
+        bar.style.display = 'block';
+    }
+}
+
+function stopQuickApply() {
+    if (quickApplyElement) {
+        quickApplyElement.style.outline = '';
+        quickApplyElement.style.transform = '';
+    }
+    quickApplyValue = null;
+    quickApplyType = null;
+    quickApplyElement = null;
+    var bar = document.getElementById('quickApplyBar');
+    if (bar) bar.style.display = 'none';
+}
+
+// ESC to exit quick apply
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && quickApplyValue) {
+        stopQuickApply();
+    }
+});
 
 var shiftCells = document.querySelectorAll('.shift-cell');
 for (var sc = 0; sc < shiftCells.length; sc++) {
@@ -4644,6 +4705,37 @@ function goBackToMain() {
 window.addEventListener('DOMContentLoaded', function() {
     populateLineSelector();
 });
+
+// Quick Apply: click cells to apply selected shift
+document.addEventListener('mousedown', function(e) {
+    if (!quickApplyValue) return;
+    if (!e.target.classList.contains('shift-cell')) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    var cell = e.target;
+    saveToUndo();
+
+    if (quickApplyType === 'shift') {
+        var choice = prompt('Is this shift a:\\n1 = Regular\\n2 = SWAP\\n3 = OT\\n4 = DT\\n\\nEnter 1-4:');
+        if (choice === '2') cell.textContent = 'SW-' + quickApplyValue;
+        else if (choice === '3') cell.textContent = 'OT-' + quickApplyValue;
+        else if (choice === '4') cell.textContent = 'DT-' + quickApplyValue;
+        else cell.textContent = quickApplyValue;
+    } else if (quickApplyType === 'compwork') {
+        showDeskPopup(cell);
+        return;
+    } else if (quickApplyType === 'special') {
+        var specChoice = prompt(quickApplyValue + ' - Is this:\\n1 = COMP\\n2 = OT\\n\\nEnter 1 or 2:');
+        if (specChoice === '1') cell.textContent = 'C-' + quickApplyValue;
+        else if (specChoice === '2') cell.textContent = 'OT-' + quickApplyValue;
+        else cell.textContent = quickApplyValue;
+    } else {
+        cell.textContent = quickApplyValue;
+    }
+    updateCellColor(cell);
+}, true);
 </script>
 </body>
 </html>`;
