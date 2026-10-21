@@ -3643,10 +3643,10 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
 
 <script>
 // Undo/Redo history with descriptions
-let undoStack = [];
-let redoStack = [];
-let originalState = null;
-let undoHistoryOpen = false;
+var undoStack = [];
+var redoStack = [];
+var originalState = null;
+var undoHistoryOpen = false;
 
 // Save original state on page load
 window.addEventListener('DOMContentLoaded', function() {
@@ -3654,23 +3654,27 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 
 function captureState() {
-    const cells = document.querySelectorAll('.shift-cell');
-    return Array.from(cells).map(cell => ({
-        text: cell.textContent,
-        classes: cell.className,
-        date: cell.getAttribute('data-date')
-    }));
+    var cells = document.querySelectorAll('.shift-cell');
+    var result = [];
+    for (var i = 0; i < cells.length; i++) {
+        result.push({
+            text: cells[i].textContent,
+            classes: cells[i].className,
+            date: cells[i].getAttribute('data-date')
+        });
+    }
+    return result;
 }
 
 function restoreState(stateData) {
-    const state = stateData.state || stateData; // Handle both old and new format
-    const cells = document.querySelectorAll('.shift-cell');
-    cells.forEach((cell, i) => {
+    var state = stateData.state || stateData; // Handle both old and new format
+    var cells = document.querySelectorAll('.shift-cell');
+    for (var i = 0; i < cells.length; i++) {
         if (state[i]) {
-            cell.textContent = state[i].text;
-            cell.className = state[i].classes;
+            cells[i].textContent = state[i].text;
+            cells[i].className = state[i].classes;
         }
-    });
+    }
     updateUndoHistoryUI();
 }
 
@@ -3681,11 +3685,11 @@ function getChangeDescription(oldState, newState) {
     }
 
     // Find what changed between states
-    let changes = [];
-    for (let i = 0; i < oldState.length && i < newState.length; i++) {
+    var changes = [];
+    for (var i = 0; i < oldState.length && i < newState.length; i++) {
         if (oldState[i] && newState[i] && oldState[i].text !== newState[i].text) {
-            const date = oldState[i].date || '';
-            const dateFormatted = date ? formatDateShort(date) : '?';
+            var date = oldState[i].date || '';
+            var dateFormatted = date ? formatDateShort(date) : '?';
             changes.push({
                 date: dateFormatted,
                 from: oldState[i].text || '',
@@ -3706,7 +3710,7 @@ function getChangeDescription(oldState, newState) {
 
 function formatDateShort(dateStr) {
     if (!dateStr) return '';
-    const parts = dateStr.split('-');
+    var parts = dateStr.split('-');
     if (parts.length >= 2) {
         return parts[1] + '/' + parts[2];
     }
@@ -3714,7 +3718,7 @@ function formatDateShort(dateStr) {
 }
 
 function saveToUndo(description) {
-    const currentState = captureState();
+    var currentState = captureState();
 
     undoStack.push({
         state: currentState,
@@ -3738,10 +3742,10 @@ function saveToUndo(description) {
 function updateLastUndoDescription() {
     if (undoStack.length === 0) return;
 
-    const lastEntry = undoStack[undoStack.length - 1];
+    var lastEntry = undoStack[undoStack.length - 1];
     if (lastEntry.description) return; // Already has description
 
-    const currentState = captureState();
+    var currentState = captureState();
     lastEntry.description = getChangeDescription(lastEntry.state, currentState);
 }
 
@@ -3752,7 +3756,7 @@ function undoChange() {
             description: 'Redo point',
             timestamp: new Date()
         });
-        const prevEntry = undoStack.pop();
+        var prevEntry = undoStack.pop();
         restoreState(prevEntry);
     } else {
         alert('Nothing to undo');
@@ -3761,10 +3765,10 @@ function undoChange() {
 
 function undoToPoint(index) {
     // Undo all changes from current back to index (inclusive)
-    const currentState = captureState();
+    var currentState = captureState();
 
     // Save all states being undone to redo stack
-    for (let i = undoStack.length - 1; i >= index; i--) {
+    for (var i = undoStack.length - 1; i >= index; i--) {
         redoStack.push(undoStack[i]);
     }
 
@@ -3788,7 +3792,7 @@ function redoChange() {
             description: 'Undo point',
             timestamp: new Date()
         });
-        const nextEntry = redoStack.pop();
+        var nextEntry = redoStack.pop();
         restoreState(nextEntry);
     } else {
         alert('Nothing to redo');
@@ -3796,7 +3800,7 @@ function redoChange() {
 }
 
 function toggleUndoHistory() {
-    const dropdown = document.getElementById('undoHistoryDropdown');
+    var dropdown = document.getElementById('undoHistoryDropdown');
     if (!dropdown) return;
 
     undoHistoryOpen = !undoHistoryOpen;
@@ -3808,8 +3812,8 @@ function toggleUndoHistory() {
 }
 
 function updateUndoHistoryUI() {
-    const list = document.getElementById('undoHistoryList');
-    const countLabel = document.getElementById('undoCountLabel');
+    var list = document.getElementById('undoHistoryList');
+    var countLabel = document.getElementById('undoCountLabel');
     if (!list) return;
 
     if (undoStack.length === 0) {
@@ -3818,12 +3822,12 @@ function updateUndoHistoryUI() {
         return;
     }
 
-    let html = '';
+    var html = '';
     // Show most recent first
-    for (let i = undoStack.length - 1; i >= 0; i--) {
-        const entry = undoStack[i];
-        const stepsAgo = undoStack.length - i;
-        const timeStr = entry.timestamp ? formatTime(entry.timestamp) : '';
+    for (var i = undoStack.length - 1; i >= 0; i--) {
+        var entry = undoStack[i];
+        var stepsAgo = undoStack.length - i;
+        var timeStr = entry.timestamp ? formatTime(entry.timestamp) : '';
 
         html += '<div onclick="undoToPoint(' + i + ')" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee; font-size:11px; transition:background 0.15s;" onmouseover="this.style.background=\'#e8f4fd\'" onmouseout="this.style.background=\'\'"><span style="color:#888; margin-right:8px;">' + stepsAgo + '.</span><span style="color:#2980b9; font-weight:bold;">' + (entry.description || 'Change') + '</span><span style="float:right; color:#aaa; font-size:10px;">' + timeStr + '</span></div>';
     }
@@ -3833,24 +3837,28 @@ function updateUndoHistoryUI() {
 }
 
 function formatTime(date) {
-    const h = date.getHours();
-    const m = date.getMinutes();
-    const ampm = h >= 12 ? 'pm' : 'am';
-    const hour = h % 12 || 12;
+    var h = date.getHours();
+    var m = date.getMinutes();
+    var ampm = h >= 12 ? 'pm' : 'am';
+    var hour = h % 12 || 12;
     return hour + ':' + (m < 10 ? '0' : '') + m + ampm;
 }
 
-// Close dropdown when clicking outside
+// Close undo dropdown when clicking outside
 document.addEventListener('click', function(e) {
-    if (undoHistoryOpen && !e.target.closest('#undoHistoryDropdown') && !e.target.closest('[onclick*="toggleUndoHistory"]')) {
-        undoHistoryOpen = false;
-        const dropdown = document.getElementById('undoHistoryDropdown');
-        if (dropdown) dropdown.style.display = 'none';
+    try {
+        if (undoHistoryOpen && !e.target.closest('#undoHistoryDropdown') && !e.target.closest('[onclick*="toggleUndoHistory"]')) {
+            undoHistoryOpen = false;
+            var dropdown = document.getElementById('undoHistoryDropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }
+    } catch(err) {
+        // Ignore errors in dropdown close handler
     }
 });
 
 function resetToOriginal() {
-    const confirmation = prompt('Type "yes" to reset all changes back to the original schedule:');
+    var confirmation = prompt('Type "yes" to reset all changes back to the original schedule:');
     if (confirmation && confirmation.toLowerCase().trim() === 'yes') {
         if (originalState) {
             saveToUndo('Before reset to original'); // Save current state so they can undo the reset
@@ -3895,7 +3903,7 @@ function printTab(tabId) {
 }
 
 function printYearOverview() {
-    const paperSize = document.getElementById('paperSize').value;
+    var paperSize = document.getElementById('paperSize').value;
 
     // Remove any existing print classes
     document.body.classList.remove('print-letter', 'print-legal');
@@ -3917,9 +3925,9 @@ function printYearOverview() {
 }
 
 function downloadAsHTML() {
-    const content = document.documentElement.outerHTML;
-    const blob = new Blob([content], {type: 'text/html'});
-    const a = document.createElement('a');
+    var content = document.documentElement.outerHTML;
+    var blob = new Blob([content], {type: 'text/html'});
+    var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'Line_${displayNum}_${bidYear}.html';
     a.click();
@@ -3927,7 +3935,7 @@ function downloadAsHTML() {
 
 // Helper to update cell color based on content
 function updateCellColor(cell) {
-    const val = cell.textContent.trim().toUpperCase();
+    var val = cell.textContent.trim().toUpperCase();
     cell.classList.remove('work', 'off', 'vac', 'hol', 'ppt', 'special', 'training', 'swap', 'swapoff', 'compoff', 'compwork', 'ot', 'dt');
     if (val === '--' || val === '') {
         cell.classList.add('off');
@@ -3975,7 +3983,7 @@ document.querySelectorAll('[contenteditable="true"]').forEach(cell => {
         });
 
         cell.addEventListener('blur', function() {
-            const val = this.textContent.trim();
+            var val = this.textContent.trim();
             if (val === '') {
                 this.textContent = '--';
             }
