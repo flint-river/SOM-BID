@@ -2690,7 +2690,7 @@ function isLineConfirmed(lineNbr) {
                 const dayData = calData.days[dateKey] || { s: '--', b: 0 };
                 const holiday = HOLIDAYS[dateKey];
                 const isBalanceDay = dayData.b === 1;
-                const isPTO = isPTODate(dateKey);
+                const myLifeInfo = isMyLifeDate(dateKey);
 
                 const colors = getShiftColor(dayData.s);
 
@@ -2702,7 +2702,10 @@ function isLineConfirmed(lineNbr) {
                 }
 
                 const dayCell = document.createElement('div');
-                dayCell.className = 'cal-day' + (holiday ? ' holiday' : '') + (colors.isOffDay && !isBalanceDay ? ' off-day' : '') + (isPTO ? ' pto-day' : '');
+                dayCell.className = 'cal-day' + (holiday ? ' holiday' : '') + (colors.isOffDay && !isBalanceDay ? ' off-day' : '') + (myLifeInfo ? ' mylife-day' : '');
+                if (myLifeInfo) {
+                    dayCell.title = myLifeInfo.label + (myLifeInfo.priority === 'must' ? ' (Must Have Off)' : ' (Prefer Off)');
+                }
                 dayCell.style.background = bgColor;
                 dayCell.style.color = textColor;
 
@@ -5954,6 +5957,35 @@ function clearComparisonLine() {
         if (window.myLifeResults) {
             displayMyLifeResults(window.myLifeResults);
         }
+    }
+
+    // Check if a date is in My Life dates (for calendar highlighting)
+    function isMyLifeDate(dateStr) {
+        const myLifeDates = loadMyLifeDates();
+        if (myLifeDates.length === 0) return null;
+
+        // Convert dateStr format "2026-4-15" to comparable date
+        const parts = dateStr.split('-');
+        const checkDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+
+        for (let i = 0; i < myLifeDates.length; i++) {
+            const item = myLifeDates[i];
+
+            if (item.type === 'range') {
+                const start = new Date(item.start + 'T00:00:00');
+                const end = new Date(item.end + 'T00:00:00');
+                if (checkDate >= start && checkDate <= end) {
+                    return { label: item.label, priority: item.priority || 'must' };
+                }
+            } else {
+                const itemDate = new Date(item.date + 'T00:00:00');
+                if (checkDate.getTime() === itemDate.getTime()) {
+                    return { label: item.label, priority: item.priority };
+                }
+            }
+        }
+
+        return null;
     }
 
     // ===========================================
