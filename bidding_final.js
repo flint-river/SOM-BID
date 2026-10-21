@@ -667,26 +667,12 @@
             document.getElementById('undoRollbackContainer').style.display = 'inline-block';
             updateUndoRollbackDropdown();
         }
-        if (document.getElementById('liveModeBtn')) {
-            document.getElementById('liveModeBtn').style.display = 'inline-block';
+        // Show admin button group
+        if (document.getElementById('adminButtonGroup')) {
+            document.getElementById('adminButtonGroup').style.display = 'inline-flex';
         }
-        if (document.getElementById('escalationBtn')) {
-            document.getElementById('escalationBtn').style.display = 'inline-block';
-        }
-        if (document.getElementById('nextYearSetupBtn')) {
-            document.getElementById('nextYearSetupBtn').style.display = 'inline-block';
-        }
-        if (document.getElementById('seniorityCompilerBtn')) {
-            document.getElementById('seniorityCompilerBtn').style.display = 'inline-block';
-        }
-        if (document.getElementById('uploadPatternsBtn')) {
-            document.getElementById('uploadPatternsBtn').style.display = 'inline-block';
-        }
-        if (document.getElementById('archiveBtn')) {
-            document.getElementById('archiveBtn').style.display = 'inline-block';
-        }
-        if (document.getElementById('colorManagerBtn')) {
-            document.getElementById('colorManagerBtn').style.display = 'inline-block';
+        if (document.getElementById('adminDivider')) {
+            document.getElementById('adminDivider').style.display = 'inline';
         }
 
         // Initialize admin year selector for universal bid application
@@ -848,34 +834,20 @@
         if (document.getElementById('undoRollbackContainer')) {
             document.getElementById('undoRollbackContainer').style.display = 'none';
         }
-        if (document.getElementById('liveModeBtn')) {
-            document.getElementById('liveModeBtn').style.display = 'none';
-            // Turn off live mode if it was on
-            if (liveMode) {
-                liveMode = false;
-                if (liveRefreshInterval) {
-                    clearInterval(liveRefreshInterval);
-                    liveRefreshInterval = null;
-                }
+        // Hide admin button group
+        if (document.getElementById('adminButtonGroup')) {
+            document.getElementById('adminButtonGroup').style.display = 'none';
+        }
+        if (document.getElementById('adminDivider')) {
+            document.getElementById('adminDivider').style.display = 'none';
+        }
+        // Turn off live mode if it was on
+        if (liveMode) {
+            liveMode = false;
+            if (liveRefreshInterval) {
+                clearInterval(liveRefreshInterval);
+                liveRefreshInterval = null;
             }
-        }
-        if (document.getElementById('escalationBtn')) {
-            document.getElementById('escalationBtn').style.display = 'none';
-        }
-        if (document.getElementById('nextYearSetupBtn')) {
-            document.getElementById('nextYearSetupBtn').style.display = 'none';
-        }
-        if (document.getElementById('colorManagerBtn')) {
-            document.getElementById('colorManagerBtn').style.display = 'none';
-        }
-        if (document.getElementById('seniorityCompilerBtn')) {
-            document.getElementById('seniorityCompilerBtn').style.display = 'none';
-        }
-        if (document.getElementById('uploadPatternsBtn')) {
-            document.getElementById('uploadPatternsBtn').style.display = 'none';
-        }
-        if (document.getElementById('archiveBtn')) {
-            document.getElementById('archiveBtn').style.display = 'none';
         }
 
         // Restart auto-refresh for viewer

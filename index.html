@@ -76,16 +76,23 @@
                 <button class="btn" onclick="toggleBidHistoryView()" id="bidHistoryBtn" style="background:#475569; color:white;">📜 History</button>
                 <button class="btn btn-legend" onclick="showLegend()" style="background:#334155; color:#94a3b8;">Legend</button>
             </div>
-            <button class="btn" onclick="toggleLiveMode()" id="liveModeBtn" style="display:none; background:#16213e; color:#4ecca3; border:1px solid #4ecca3;">🔴 Live Mode</button>
-            <button class="btn" onclick="showEscalationManager()" id="escalationBtn" style="display:none; background:#f39c12; color:#1a1a2e;">🔄 Escalation</button>
-            <button class="btn" onclick="showNextYearSetup()" id="nextYearSetupBtn" style="display:none; background:#9b59b6; color:white;">⚙️ Next Year Setup</button>
-            <button class="btn" onclick="triggerPatternUpload()" id="uploadPatternsBtn" style="display:none; background:#27ae60; color:white;">📁 Upload Patterns</button>
-            <input type="file" id="patternFileInput" accept=".json" style="display:none;" onchange="handlePatternUpload(event)">
-            <button class="btn" onclick="window.open('seniority_compiler.html', '_blank')" id="seniorityCompilerBtn" style="display:none; background:#27ae60; color:white;">📋 Seniority Compiler</button>
-            <button class="btn" onclick="showArchiveViewer()" id="archiveBtn" style="display:none; background:#8e44ad; color:white;">📁 Archive</button>
-            <button class="btn" onclick="showColorManager()" id="colorManagerBtn" style="display:none; background:#e74c3c; color:white;">🎨 Manage Colors</button>
-            <div class="undo-rollback-container" id="undoRollbackContainer" style="display:none; position:relative;">
-                <button class="btn" onclick="toggleUndoRollbackDropdown()" id="undoRollbackBtn" style="background:#f0a500; color:#1a1a2e;">↩️ Undo Rollback ▾</button>
+
+            <!-- ADMIN GROUP (hidden until admin mode) -->
+            <span id="adminDivider" style="display:none; color:#333; margin:0 2px;">│</span>
+            <div id="adminButtonGroup" class="btn-group" style="display:none; gap:4px; background:rgba(251,191,36,0.15); padding:4px 8px; border-radius:8px; border:1px solid rgba(251,191,36,0.3);">
+                <button class="btn" onclick="toggleLiveMode()" id="liveModeBtn" style="background:#16213e; color:#4ecca3; border:1px solid #4ecca3;">🔴 Live</button>
+                <button class="btn" onclick="showEscalationManager()" id="escalationBtn" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#1a1a2e;">⚡ Escalate</button>
+                <button class="btn" onclick="triggerPatternUpload()" id="uploadPatternsBtn" style="background:#059669; color:white;">📁 Patterns</button>
+                <input type="file" id="patternFileInput" accept=".json" style="display:none;" onchange="handlePatternUpload(event)">
+                <button class="btn" onclick="window.open('seniority_compiler.html', '_blank')" id="seniorityCompilerBtn" style="background:#0d9488; color:white;">📋 Seniority</button>
+                <button class="btn" onclick="showArchiveViewer()" id="archiveBtn" style="background:#7c3aed; color:white;">📁 Archive</button>
+                <button class="btn" onclick="showColorManager()" id="colorManagerBtn" style="background:#dc2626; color:white;">🎨 Colors</button>
+                <button class="btn" onclick="showNextYearSetup()" id="nextYearSetupBtn" style="background:#7c3aed; color:white;">⚙️ Next Year</button>
+            </div>
+
+            <!-- UNDO GROUP (separate, shown when available) -->
+            <div class="undo-rollback-container" id="undoRollbackContainer" style="display:none; position:relative; margin-left:4px;">
+                <button class="btn" onclick="toggleUndoRollbackDropdown()" id="undoRollbackBtn" style="background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#1a1a2e;">↩️ Undo ▾</button>
                 <div class="undo-rollback-dropdown" id="undoRollbackDropdown"></div>
             </div>
             <span class="mode-indicator viewer" id="modeIndicator">VIEWER</span>
