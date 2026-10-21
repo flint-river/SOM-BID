@@ -3717,17 +3717,30 @@ function formatTime(date) {
 }
 
 function saveToUndo(description) {
-    var currentState = captureState();
-    var prevEntry = undoStack.length > 0 ? undoStack[undoStack.length - 1] : null;
-    var desc = description || getChangeDescription(prevEntry, { state: currentState });
+    try {
+        var currentState = captureState();
+        var desc = description || 'Change';
+        try {
+            var prevEntry = undoStack.length > 0 ? undoStack[undoStack.length - 1] : null;
+            if (prevEntry && !description) {
+                desc = getChangeDescription(prevEntry, { state: currentState });
+            }
+        } catch (e) {
+            desc = 'Change';
+        }
 
-    undoStack.push({
-        state: currentState,
-        description: desc,
-        timestamp: new Date()
-    });
-    redoStack = []; // Clear redo when new change is made
-    if (undoStack.length > 50) undoStack.shift(); // Limit history
+        undoStack.push({
+            state: currentState,
+            description: desc,
+            timestamp: new Date()
+        });
+        redoStack = []; // Clear redo when new change is made
+        if (undoStack.length > 50) undoStack.shift(); // Limit history
+    } catch (err) {
+        // Fallback to simple push
+        undoStack.push(captureState());
+        redoStack = [];
+    }
 }
 
 function undoChange() {
@@ -3818,21 +3831,23 @@ function undoToPoint(index) {
 
 // Close undo dropdown when clicking outside
 document.addEventListener('click', function(e) {
-    if (undoHistoryOpen) {
+    try {
+        if (!undoHistoryOpen) return;
         var dropdown = document.getElementById('undoHistoryDropdown');
-        var isClickInside = false;
-        var el = e.target;
-        while (el) {
-            if (el.id === 'undoHistoryDropdown' || (el.onclick && el.onclick.toString().indexOf('toggleUndoHistory') !== -1)) {
-                isClickInside = true;
-                break;
-            }
-            el = el.parentElement;
+        if (!dropdown) return;
+
+        // Check if click is inside dropdown or on toggle button
+        var target = e.target;
+        while (target) {
+            if (target === dropdown) return;
+            if (target.getAttribute && target.getAttribute('onclick') && target.getAttribute('onclick').indexOf('toggleUndoHistory') !== -1) return;
+            target = target.parentElement;
         }
-        if (!isClickInside) {
-            undoHistoryOpen = false;
-            if (dropdown) dropdown.style.display = 'none';
-        }
+
+        undoHistoryOpen = false;
+        dropdown.style.display = 'none';
+    } catch (err) {
+        // Ignore errors
     }
 });
 
@@ -4132,7 +4147,11 @@ for (var di = 0; di < dragItems.length; di++) {
 
     // Click handler for Quick Apply mode
     dragItems[di].addEventListener('click', function(e) {
-        toggleStickyMode(this);
+        try {
+            toggleStickyMode(this);
+        } catch (err) {
+            console.error('Quick Apply error:', err);
+        }
     });
 }
 
@@ -4304,53 +4323,6 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
         e.preventDefault();
         selectMainCellForSwap(this);
     });
-
-    // Click handler for Quick Apply mode
-    (function(cell) {
-        cell.addEventListener('click', function(e) {
-            // Only handle if in sticky mode
-            if (!stickyShift) return;
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            // Shift+click for range selection
-            if (e.shiftKey && lastClickedCell) {
-                // Get all shift cells
-                var allCells = document.querySelectorAll('.shift-cell');
-                var allCellsArr = [];
-                for (var c = 0; c < allCells.length; c++) { allCellsArr.push(allCells[c]); }
-
-                var startIdx = -1;
-                var endIdx = -1;
-                for (var idx = 0; idx < allCellsArr.length; idx++) {
-                    if (allCellsArr[idx] === lastClickedCell) startIdx = idx;
-                    if (allCellsArr[idx] === cell) endIdx = idx;
-                }
-
-                if (startIdx > endIdx) {
-                    var temp = startIdx;
-                    startIdx = endIdx;
-                    endIdx = temp;
-                }
-
-                // Highlight range
-                clearRangeSelection();
-                for (var r = startIdx; r <= endIdx; r++) {
-                    allCellsArr[r].classList.add('range-selected');
-                }
-
-                // Apply to range
-                applyStickyToRange(lastClickedCell, cell);
-                lastClickedCell = null;
-            } else {
-                // Single click - apply to this cell
-                clearRangeSelection();
-                applyStickyShiftToCell(cell);
-                lastClickedCell = cell;
-            }
-        });
-    })(shiftCells[sc]);
 
     // Mousedown - only interfere with contenteditable in swap mode
     shiftCells[sc].addEventListener('mousedown', function(e) {
@@ -5010,6 +4982,55 @@ function goBackToMain() {
 window.addEventListener('DOMContentLoaded', function() {
     populateLineSelector();
 });
+
+// Event delegation for Quick Apply mode on shift cells
+document.addEventListener('click', function(e) {
+    try {
+        // Only process if in sticky mode
+        if (!stickyShift) return;
+
+        // Check if clicked element is a shift cell
+        var cell = e.target;
+        if (!cell.classList || !cell.classList.contains('shift-cell')) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Shift+click for range selection
+        if (e.shiftKey && lastClickedCell) {
+            var allCells = document.querySelectorAll('.shift-cell');
+            var allCellsArr = [];
+            for (var c = 0; c < allCells.length; c++) { allCellsArr.push(allCells[c]); }
+
+            var startIdx = -1;
+            var endIdx = -1;
+            for (var idx = 0; idx < allCellsArr.length; idx++) {
+                if (allCellsArr[idx] === lastClickedCell) startIdx = idx;
+                if (allCellsArr[idx] === cell) endIdx = idx;
+            }
+
+            if (startIdx > endIdx) {
+                var temp = startIdx;
+                startIdx = endIdx;
+                endIdx = temp;
+            }
+
+            clearRangeSelection();
+            for (var r = startIdx; r <= endIdx; r++) {
+                allCellsArr[r].classList.add('range-selected');
+            }
+
+            applyStickyToRange(lastClickedCell, cell);
+            lastClickedCell = null;
+        } else {
+            clearRangeSelection();
+            applyStickyShiftToCell(cell);
+            lastClickedCell = cell;
+        }
+    } catch (err) {
+        // Ignore errors
+    }
+}, true); // Use capture phase to intercept before contenteditable
 </script>
 </body>
 </html>`;
