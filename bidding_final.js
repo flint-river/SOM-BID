@@ -3507,6 +3507,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <b>Receive shift:</b> Load a comparison line (orange), then drag THEIR shift to YOUR cell = auto-swap.
         <b>Give shift:</b> Click "Give Shift Mode" button, double-click YOUR cell (red border), click THEIR cell = you give it up.
         <b>UNDO/REDO/RESET</b> for changes. <b>Ctrl+S</b> to download.
+        <br><b style="color:#e74c3c;">TIP - Quick Apply:</b> <b>Click</b> any shift/time-off in the palette below to select it, then <b>click</b> cells to apply repeatedly. <b>Shift+Click</b> for range fill!
     </div>
     <div id="quickApplyBar" class="no-print" style="display:none; background:#ffe4e1; border:2px solid #e74c3c; border-radius:6px; padding:10px 15px; margin:5px 0; font-size:12px;">
         <b style="color:#c0392b;">QUICK APPLY MODE:</b> <span id="quickApplyName" style="background:#ff69b4; padding:2px 8px; border-radius:4px; font-weight:bold;"></span> selected.
