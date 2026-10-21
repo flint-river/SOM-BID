@@ -3392,7 +3392,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 </head>
 <body>
 <div class="toolbar no-print">
-    <button onclick="goBackToMain()" style="background:#6c757d; color:white; font-weight:bold;">&#8592; Back</button>
+    <button onclick="goBackToMain()" style="background:#6c757d; color:white; font-weight:bold;">&#8592; Back to Main Bid Page</button>
     <button onclick="downloadAsHTML()" style="background:#28a745; color:white; font-weight:bold; margin-left:10px;">SAVE</button>
     <span style="margin-left:15px; border-left:2px solid #ccc; padding-left:15px; display:flex; align-items:center; gap:8px;">
         <label style="font-weight:bold; color:#333;">Switch Line:</label>
@@ -3518,6 +3518,9 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <span style="color:#c0392b;"><b>VDI Users:</b></span> Downloads folder is cleared when you sign out!
         After saving, <b>move the file to your Desktop</b> or a network drive to keep it permanently.
     </div>
+    <div class="no-print" style="background:#e8f4fd; border:1px solid #3498db; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
+        <b style="color:#2980b9;">💡 QUICK APPLY TIP:</b> <b>Click</b> any shift below to enter Quick Apply mode - then <b>click cells</b> to apply repeatedly, or <b>Shift+Click</b> for a range. Press <b>ESC</b> to exit.
+    </div>
     <div class="drag-palette no-print">
         <span style="font-weight:bold; margin-right:5px;">Time Off:</span>
         <div class="drag-item vac" draggable="true" data-value="VAC" data-type="timeoff">VAC</div>
@@ -3532,7 +3535,17 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <div class="drag-item training" draggable="true" data-value="TRN" data-type="special">TRN</div>
     </div>
 ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e8e8;">
-        <button onclick="undoChange()" class="edit-btn" title="Undo">↩ UNDO</button>
+        <div style="display:inline-block; position:relative;">
+            <button onclick="undoChange()" class="edit-btn" title="Undo last change" style="border-radius:4px 0 0 4px; border-right:none;">↩ UNDO</button><button onclick="toggleUndoHistory()" class="edit-btn" title="Undo History" style="border-radius:0 4px 4px 0; padding:6px 8px;">▼</button>
+            <div id="undoHistoryDropdown" style="display:none; position:absolute; top:100%; left:0; min-width:320px; background:#fff; border:2px solid #666; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:1000; margin-top:2px;">
+                <div style="padding:8px 12px; background:#f0f0f0; border-bottom:1px solid #ccc; font-weight:bold; font-size:11px;">Undo History (click to restore)</div>
+                <div id="undoHistoryList" style="max-height:200px; overflow-y:auto;"></div>
+                <div style="padding:6px 12px; border-top:1px solid #ccc; background:#f8f8f8;">
+                    <button onclick="resetToOriginal(); toggleUndoHistory();" class="edit-btn reset-btn" style="font-size:10px; padding:4px 10px;">↩ Restore Original</button>
+                    <span id="undoCountLabel" style="margin-left:10px; font-size:10px; color:#666;"></span>
+                </div>
+            </div>
+        </div>
         <button onclick="redoChange()" class="edit-btn" title="Redo">↪ REDO</button>
         <button onclick="resetToOriginal()" class="edit-btn reset-btn" title="Reset to Original">🔄 RESET</button>
         <button id="swapModeBtn" onclick="toggleSwapMode()" class="edit-btn" style="background:#9b59b6; margin-left:10px;" title="Switch to Give Shift mode to give your shifts to comparison line">🔄 Give Shift Mode</button>
@@ -3629,10 +3642,11 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
 </div>
 
 <script>
-// Undo/Redo history
+// Undo/Redo history with descriptions
 let undoStack = [];
 let redoStack = [];
 let originalState = null;
+let undoHistoryOpen = false;
 
 // Save original state on page load
 window.addEventListener('DOMContentLoaded', function() {
@@ -3643,11 +3657,13 @@ function captureState() {
     const cells = document.querySelectorAll('.shift-cell');
     return Array.from(cells).map(cell => ({
         text: cell.textContent,
-        classes: cell.className
+        classes: cell.className,
+        date: cell.getAttribute('data-date')
     }));
 }
 
-function restoreState(state) {
+function restoreState(stateData) {
+    const state = stateData.state || stateData; // Handle both old and new format
     const cells = document.querySelectorAll('.shift-cell');
     cells.forEach((cell, i) => {
         if (state[i]) {
@@ -3655,40 +3671,181 @@ function restoreState(state) {
             cell.className = state[i].classes;
         }
     });
+    updateUndoHistoryUI();
 }
 
-function saveToUndo() {
-    undoStack.push(captureState());
+function getChangeDescription(oldState, newState) {
+    // Find what changed between states
+    let changes = [];
+    for (let i = 0; i < oldState.length && i < newState.length; i++) {
+        if (oldState[i].text !== newState[i].text) {
+            const date = oldState[i].date || '';
+            const dateFormatted = date ? formatDateShort(date) : '?';
+            changes.push({
+                date: dateFormatted,
+                from: oldState[i].text,
+                to: newState[i].text
+            });
+        }
+    }
+
+    if (changes.length === 0) return 'No changes';
+    if (changes.length === 1) {
+        return changes[0].from + ' → ' + changes[0].to + ' (' + changes[0].date + ')';
+    }
+    if (changes.length <= 3) {
+        return changes.map(c => c.to).join(', ') + ' (' + changes.length + ' cells)';
+    }
+    return changes[0].to + ' applied to ' + changes.length + ' cells';
+}
+
+function formatDateShort(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length >= 2) {
+        return parts[1] + '/' + parts[2];
+    }
+    return dateStr;
+}
+
+function saveToUndo(description) {
+    const currentState = captureState();
+
+    undoStack.push({
+        state: currentState,
+        description: description || null, // Will be generated after change is made
+        timestamp: new Date()
+    });
     redoStack = []; // Clear redo when new change is made
     if (undoStack.length > 50) undoStack.shift(); // Limit history
+
+    // Schedule description generation after the change is made
+    setTimeout(function() {
+        updateLastUndoDescription();
+        updateUndoHistoryUI();
+    }, 100);
+}
+
+function updateLastUndoDescription() {
+    if (undoStack.length === 0) return;
+
+    const lastEntry = undoStack[undoStack.length - 1];
+    if (lastEntry.description) return; // Already has description
+
+    const currentState = captureState();
+    lastEntry.description = getChangeDescription(lastEntry.state, currentState);
 }
 
 function undoChange() {
     if (undoStack.length > 0) {
-        redoStack.push(captureState());
-        const prevState = undoStack.pop();
-        restoreState(prevState);
+        redoStack.push({
+            state: captureState(),
+            description: 'Redo point',
+            timestamp: new Date()
+        });
+        const prevEntry = undoStack.pop();
+        restoreState(prevEntry);
     } else {
         alert('Nothing to undo');
     }
 }
 
+function undoToPoint(index) {
+    // Undo all changes from current back to index (inclusive)
+    const currentState = captureState();
+
+    // Save all states being undone to redo stack
+    for (let i = undoStack.length - 1; i >= index; i--) {
+        redoStack.push(undoStack[i]);
+    }
+
+    // Remove from undo stack
+    undoStack = undoStack.slice(0, index);
+
+    // Restore the state before the selected point
+    if (index > 0) {
+        restoreState(undoStack[index - 1]);
+    } else {
+        restoreState({ state: originalState });
+    }
+
+    toggleUndoHistory(); // Close dropdown
+}
+
 function redoChange() {
     if (redoStack.length > 0) {
-        undoStack.push(captureState());
-        const nextState = redoStack.pop();
-        restoreState(nextState);
+        undoStack.push({
+            state: captureState(),
+            description: 'Undo point',
+            timestamp: new Date()
+        });
+        const nextEntry = redoStack.pop();
+        restoreState(nextEntry);
     } else {
         alert('Nothing to redo');
     }
 }
 
+function toggleUndoHistory() {
+    const dropdown = document.getElementById('undoHistoryDropdown');
+    if (!dropdown) return;
+
+    undoHistoryOpen = !undoHistoryOpen;
+    dropdown.style.display = undoHistoryOpen ? 'block' : 'none';
+
+    if (undoHistoryOpen) {
+        updateUndoHistoryUI();
+    }
+}
+
+function updateUndoHistoryUI() {
+    const list = document.getElementById('undoHistoryList');
+    const countLabel = document.getElementById('undoCountLabel');
+    if (!list) return;
+
+    if (undoStack.length === 0) {
+        list.innerHTML = '<div style="padding:12px; color:#888; text-align:center; font-size:11px;">No changes yet</div>';
+        if (countLabel) countLabel.textContent = '';
+        return;
+    }
+
+    let html = '';
+    // Show most recent first
+    for (let i = undoStack.length - 1; i >= 0; i--) {
+        const entry = undoStack[i];
+        const stepsAgo = undoStack.length - i;
+        const timeStr = entry.timestamp ? formatTime(entry.timestamp) : '';
+
+        html += '<div onclick="undoToPoint(' + i + ')" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee; font-size:11px; transition:background 0.15s;" onmouseover="this.style.background=\'#e8f4fd\'" onmouseout="this.style.background=\'\'"><span style="color:#888; margin-right:8px;">' + stepsAgo + '.</span><span style="color:#2980b9; font-weight:bold;">' + (entry.description || 'Change') + '</span><span style="float:right; color:#aaa; font-size:10px;">' + timeStr + '</span></div>';
+    }
+
+    list.innerHTML = html;
+    if (countLabel) countLabel.textContent = undoStack.length + ' change(s) in history';
+}
+
+function formatTime(date) {
+    const h = date.getHours();
+    const m = date.getMinutes();
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const hour = h % 12 || 12;
+    return hour + ':' + (m < 10 ? '0' : '') + m + ampm;
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (undoHistoryOpen && !e.target.closest('#undoHistoryDropdown') && !e.target.closest('[onclick*="toggleUndoHistory"]')) {
+        undoHistoryOpen = false;
+        const dropdown = document.getElementById('undoHistoryDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+    }
+});
+
 function resetToOriginal() {
     const confirmation = prompt('Type "yes" to reset all changes back to the original schedule:');
     if (confirmation && confirmation.toLowerCase().trim() === 'yes') {
         if (originalState) {
-            saveToUndo(); // Save current state so they can undo the reset
-            restoreState(originalState);
+            saveToUndo('Before reset to original'); // Save current state so they can undo the reset
+            restoreState({ state: originalState });
             alert('Schedule reset to original!');
         } else {
             alert('Original state not available. Refresh the page from the main app.');
