@@ -3308,9 +3308,9 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 </div>
 
 <div class="tabs no-print">
-    <button class="tab-btn active" onclick="showTab('yearview')">Year Overview</button>
-    <button class="tab-btn" onclick="showTab('summary')">Summary</button>
-    <button class="tab-btn" onclick="showTab('schedule')">Schedule</button>
+    <button class="tab-btn active" onclick="showTab('yearview', this)">Year Overview</button>
+    <button class="tab-btn" onclick="showTab('summary', this)">Summary</button>
+    <button class="tab-btn" onclick="showTab('schedule', this)">Schedule</button>
 </div>
 
 <!-- SCHEDULE TAB -->
@@ -3588,11 +3588,15 @@ function resetToOriginal() {
     }
 }
 
-function showTab(tabId) {
+function showTab(tabId, btn) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
+    if (btn) {
+        btn.classList.add('active');
+    } else if (event && event.target) {
+        event.target.classList.add('active');
+    }
 }
 
 function printTab(tabId) {
@@ -3959,7 +3963,7 @@ var activePartner = null;  // Currently displayed partner
 // Seasonal desks data for proper shift transformation
 var SEASONAL_DESKS = ${JSON.stringify(window.SEASONAL_DESKS || [])};
 
-// All lines data embedded from ANNUAL_BID
+// All lines data embedded from ANNUAL_BID (count: ${ANNUAL_BID ? ANNUAL_BID.length : 0})
 var allLinesData = ${JSON.stringify(
     ANNUAL_BID.reduce((acc, line) => {
         const lineKey = line.lineNbr.toString();
@@ -3979,10 +3983,24 @@ var allLinesData = ${JSON.stringify(
         return acc;
     }, {})
 )};
+console.log('[Your Edit] allLinesData loaded with', Object.keys(allLinesData).length, 'lines');
 
 // Populate dropdown on page load
 function loadAllLinesForDropdown() {
     var select = document.getElementById('compareLineSelect');
+
+    // Debug logging
+    console.log('[Your Edit] Loading lines for dropdown...');
+    console.log('[Your Edit] allLinesData keys:', Object.keys(allLinesData).length);
+
+    if (Object.keys(allLinesData).length === 0) {
+        console.error('[Your Edit] ERROR: No line data available!');
+        var errorOpt = document.createElement('option');
+        errorOpt.disabled = true;
+        errorOpt.textContent = '(No lines loaded - check console)';
+        select.appendChild(errorOpt);
+        return;
+    }
 
     // Separate SSOM and SOM lines
     var ssomLines = [];
