@@ -1717,6 +1717,30 @@ function isLineConfirmed(lineNbr) {
         window.location.href = url;
     }
 
+    // Open Year Flythrough (cinematic 3D visualization)
+    function openYearFlythrough(lineNbr) {
+        const bidYear = BID_CONFIG.getBidYear();
+        const defaultYear = BID_CONFIG.DEFAULT_BID_YEAR;
+        let url = 'year_flythrough.html';
+        let params = [];
+
+        // Pass line if specified
+        if (lineNbr) {
+            params.push(`line=${encodeURIComponent(lineNbr)}`);
+        }
+
+        // Pass bidYear parameter if not using default year
+        if (bidYear !== defaultYear) {
+            params.push(`bidYear=${bidYear}`);
+        }
+
+        if (params.length > 0) {
+            url += '?' + params.join('&');
+        }
+
+        window.location.href = url;
+    }
+
     // Holiday Summary Functions
     // HOLIDAY_PATTERN_MAP - Dynamically generated based on bid year
     // Get current HOLIDAY_PATTERN_MAP from window (set by bid_app_init.js)
@@ -8752,6 +8776,7 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.closeDeskMoveMenu = closeDeskMoveMenu;
     window.moveDeskToGroup = moveDeskToGroup;
     window.openYearTimeline = openYearTimeline;
+    window.openYearFlythrough = openYearFlythrough;
 
     // Change a desk's group assignment
     async function changeDeskAssignment(desk, newGroup) {
