@@ -3510,7 +3510,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
     </div>
     <div id="quickApplyBar" class="no-print" style="display:none; background:#ffe4e1; border:2px solid #e74c3c; border-radius:6px; padding:10px 15px; margin:5px 0; font-size:12px;">
         <b style="color:#c0392b;">QUICK APPLY MODE:</b> <span id="quickApplyName" style="background:#ff69b4; padding:2px 8px; border-radius:4px; font-weight:bold;"></span> selected.
-        <b>Click</b> any cell to apply. Press <b>ESC</b> or click the shift again to exit.
+        <b>Click</b> cell to apply. <b>Shift+Click</b> for range. <b>ESC</b> to exit.
     </div>
     <div class="no-print" style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
         <b>SAVE REMINDER:</b> Press <b>Ctrl+S</b> to save this file to your <b>Downloads</b> folder.
@@ -3998,6 +3998,7 @@ for (var di = 0; di < dragItems.length; di++) {
 var quickApplyValue = null;
 var quickApplyType = null;
 var quickApplyElement = null;
+var lastQuickApplyCell = null;
 
 function startQuickApply(element) {
     var value = element.getAttribute('data-value');
@@ -4038,6 +4039,7 @@ function stopQuickApply() {
     quickApplyValue = null;
     quickApplyType = null;
     quickApplyElement = null;
+    lastQuickApplyCell = null;
     var bar = document.getElementById('quickApplyBar');
     if (bar) bar.style.display = 'none';
 }
@@ -4725,6 +4727,28 @@ document.addEventListener('mousedown', function(e) {
     e.stopPropagation();
 
     var cell = e.target;
+
+    // Shift+Click for range selection
+    if (e.shiftKey && lastQuickApplyCell && lastQuickApplyCell !== cell) {
+        var allCells = document.querySelectorAll('.shift-cell');
+        var startIdx = -1;
+        var endIdx = -1;
+        for (var i = 0; i < allCells.length; i++) {
+            if (allCells[i] === lastQuickApplyCell) startIdx = i;
+            if (allCells[i] === cell) endIdx = i;
+        }
+        if (startIdx > -1 && endIdx > -1) {
+            if (startIdx > endIdx) { var tmp = startIdx; startIdx = endIdx; endIdx = tmp; }
+            saveToUndo();
+            for (var j = startIdx; j <= endIdx; j++) {
+                allCells[j].textContent = quickApplyValue;
+                updateCellColor(allCells[j]);
+            }
+            lastQuickApplyCell = cell;
+            return;
+        }
+    }
+
     saveToUndo();
 
     if (quickApplyType === 'shift') {
@@ -4745,6 +4769,7 @@ document.addEventListener('mousedown', function(e) {
         cell.textContent = quickApplyValue;
     }
     updateCellColor(cell);
+    lastQuickApplyCell = cell;
 }, true);
 </script>
 </body>
