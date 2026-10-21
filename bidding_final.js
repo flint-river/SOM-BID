@@ -3706,7 +3706,7 @@ document.querySelectorAll('[contenteditable="true"]').forEach(cell => {
 });
 
 // Desk list for COMP WORK popup
-var ALL_DESKS = ${JSON.stringify(allDesksList)};
+var ALL_DESKS = [];
 
 // Show desk selection popup for COMP WORK
 function showDeskPopup(targetCell) {
@@ -3961,26 +3961,10 @@ var swapPartners = [];
 var activePartner = null;
 
 // Seasonal desks data for proper shift transformation
-var SEASONAL_DESKS = ${JSON.stringify(window.SEASONAL_DESKS || [])};
+var SEASONAL_DESKS = [];
 
-// All lines data embedded from ANNUAL_BID
-var allLinesData = ${JSON.stringify(
-    (ANNUAL_BID || []).reduce((acc, line) => {
-        if (!line || !line.lineNbr) return acc;
-        const lineKey = String(line.lineNbr);
-        const numPart = lineKey.split('-')[0];
-        const days = line.days || [];
-        const patternSnippet = days.slice(0, 12).map(d => d || '--').join(' ');
-        acc[lineKey] = {
-            lineNbr: lineKey,
-            displayNum: parseInt(numPart) || 0,
-            lineDesc: String(line.lineDesc || '').replace(/[`$\\]/g, ''),
-            patternSnippet: patternSnippet,
-            days: days
-        };
-        return acc;
-    }, {})
-).replace(/\\/g, '\\\\').replace(/`/g, '\\`')};
+// All lines data - will be populated from main app
+var allLinesData = {};
 
 // Populate dropdown on page load
 function loadAllLinesForDropdown() {
