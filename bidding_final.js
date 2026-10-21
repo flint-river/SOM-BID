@@ -4347,6 +4347,54 @@ function clearComparisonLine() {
 </body>
 </html>`;
 
+        // DEBUG: Output lines around error location and validate JS
+        const debugLines = html.split('\n');
+        console.log('Total generated HTML lines:', debugLines.length);
+        console.log('--- Lines 1315-1325 ---');
+        for (let i = 1314; i < Math.min(debugLines.length, 1325); i++) {
+            console.log((i + 1) + ': ' + debugLines[i]);
+        }
+        console.log('--- End debug ---');
+
+        // Try to extract and validate the script section
+        const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
+        if (scriptMatch) {
+            const scriptContent = scriptMatch[1];
+            const scriptLines = scriptContent.split('\n');
+            console.log('Script section has', scriptLines.length, 'lines');
+
+            // Find line 1319 relative to script start
+            const scriptStartLine = html.substring(0, html.indexOf('<script>')).split('\n').length;
+            console.log('Script starts at HTML line:', scriptStartLine);
+            const errorLineInScript = 1319 - scriptStartLine;
+            console.log('Error would be at script line:', errorLineInScript);
+
+            if (errorLineInScript > 0 && errorLineInScript <= scriptLines.length) {
+                console.log('--- Script lines around error ---');
+                for (let i = Math.max(0, errorLineInScript - 5); i < Math.min(scriptLines.length, errorLineInScript + 5); i++) {
+                    const marker = (i + 1 === errorLineInScript) ? '>>> ' : '    ';
+                    console.log(marker + (i + 1) + ': ' + scriptLines[i]);
+                }
+            }
+
+            // Try to parse the JavaScript
+            try {
+                new Function(scriptContent);
+                console.log('✓ JavaScript parses successfully');
+            } catch (e) {
+                console.log('✗ JavaScript parse error:', e.message);
+                // Find error position
+                const match = e.message.match(/position (\d+)/);
+                if (match) {
+                    const pos = parseInt(match[1]);
+                    const beforeError = scriptContent.substring(0, pos);
+                    const errorLine = beforeError.split('\n').length;
+                    console.log('Error appears to be around script line:', errorLine);
+                }
+            }
+        }
+        console.log('=== END DEBUG INFO ===');
+
         // Create blob URL and open in new tab
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
