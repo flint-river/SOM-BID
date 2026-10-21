@@ -3508,14 +3508,6 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <b>Give shift:</b> Click "Give Shift Mode" button, double-click YOUR cell (red border), click THEIR cell = you give it up.
         <b>UNDO/REDO/RESET</b> for changes. <b>Ctrl+S</b> to download.
     </div>
-    <div id="stickyModeBar" class="no-print" style="display:none; background:#ffe4e1; border:2px solid #e74c3c; border-radius:6px; padding:10px 15px; margin:5px 0; font-size:12px;">
-        <b style="color:#c0392b;">QUICK APPLY MODE:</b> <span id="stickyShiftName" style="background:#ff69b4; padding:2px 8px; border-radius:4px; font-weight:bold;"></span> selected.
-        <b>Click</b> any cell to apply. <b>Shift+Click</b> to select a range.
-        Press <b>ESC</b> or click the shift again to exit.
-    </div>
-    <div class="no-print" style="background:#e8f4fd; border:1px solid #3498db; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
-        <b style="color:#2980b9;">QUICK APPLY TIP:</b> <b>Click</b> any shift below to enter Quick Apply mode - then <b>click cells</b> to apply repeatedly, or <b>Shift+Click</b> for a range. Press <b>ESC</b> to exit.
-    </div>
     <div class="no-print" style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
         <b>SAVE REMINDER:</b> Press <b>Ctrl+S</b> to save this file to your <b>Downloads</b> folder.
         <span style="color:#c0392b;"><b>VDI Users:</b></span> Downloads folder is cleared when you sign out!
@@ -3535,13 +3527,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <div class="drag-item training" draggable="true" data-value="TRN" data-type="special">TRN</div>
     </div>
 ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e8e8;">
-        <div style="position:relative; display:inline-block;">
-            <button onclick="undoChange()" class="edit-btn" title="Undo" style="border-radius:4px 0 0 4px; margin-right:0;">↩ UNDO</button><button onclick="toggleUndoHistory()" class="edit-btn" title="Undo History" style="border-radius:0 4px 4px 0; padding:5px 6px; margin-left:-1px; border-left:1px solid rgba(255,255,255,0.3);">▼</button>
-            <div id="undoHistoryDropdown" style="display:none; position:absolute; top:100%; left:0; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); min-width:280px; max-height:300px; overflow:auto; z-index:1000;">
-                <div style="padding:8px 12px; background:#f5f5f5; border-bottom:1px solid #eee; font-size:11px; color:#666;"><b>Undo History</b> <span id="undoCountLabel" style="float:right;"></span></div>
-                <div id="undoHistoryList"></div>
-            </div>
-        </div>
+        <button onclick="undoChange()" class="edit-btn" title="Undo">↩ UNDO</button>
         <button onclick="redoChange()" class="edit-btn" title="Redo">↪ REDO</button>
         <button onclick="resetToOriginal()" class="edit-btn reset-btn" title="Reset to Original">🔄 RESET</button>
         <button id="swapModeBtn" onclick="toggleSwapMode()" class="edit-btn" style="background:#9b59b6; margin-left:10px;" title="Switch to Give Shift mode to give your shifts to comparison line">🔄 Give Shift Mode</button>
@@ -3661,98 +3647,26 @@ function captureState() {
 }
 
 function restoreState(state) {
-    // Handle both old format (array) and new format (object with state property)
-    var stateArr = state;
-    if (state && state.state) {
-        stateArr = state.state;
-    }
     var cells = document.querySelectorAll('.shift-cell');
     for (var i = 0; i < cells.length; i++) {
-        if (stateArr[i]) {
-            cells[i].textContent = stateArr[i].text;
-            cells[i].className = stateArr[i].classes;
+        if (state[i]) {
+            cells[i].textContent = state[i].text;
+            cells[i].className = state[i].classes;
         }
     }
 }
 
-var undoHistoryOpen = false;
-
-function getChangeDescription(oldState, newState) {
-    // Safety check
-    if (!oldState || !newState) return 'Change';
-    var oldArr = oldState.state || oldState;
-    var newArr = newState.state || newState;
-    if (!oldArr || !newArr || !oldArr.length || !newArr.length) return 'Change';
-
-    // Find what changed between states
-    var changes = [];
-    var len = Math.min(oldArr.length, newArr.length);
-    for (var i = 0; i < len; i++) {
-        if (oldArr[i] && newArr[i] && oldArr[i].text !== newArr[i].text) {
-            changes.push({
-                from: oldArr[i].text || '',
-                to: newArr[i].text || ''
-            });
-        }
-    }
-
-    if (changes.length === 0) return 'No changes';
-    if (changes.length === 1) {
-        return changes[0].from + ' -> ' + changes[0].to;
-    }
-    if (changes.length <= 3) {
-        var toVals = [];
-        for (var j = 0; j < changes.length; j++) { toVals.push(changes[j].to); }
-        return toVals.join(', ') + ' (' + changes.length + ' cells)';
-    }
-    return changes[0].to + ' applied to ' + changes.length + ' cells';
-}
-
-function formatTime(date) {
-    var h = date.getHours();
-    var m = date.getMinutes();
-    var ampm = h >= 12 ? 'pm' : 'am';
-    var hour = h % 12 || 12;
-    return hour + ':' + (m < 10 ? '0' : '') + m + ampm;
-}
-
-function saveToUndo(description) {
-    try {
-        var currentState = captureState();
-        var desc = description || 'Change';
-        try {
-            var prevEntry = undoStack.length > 0 ? undoStack[undoStack.length - 1] : null;
-            if (prevEntry && !description) {
-                desc = getChangeDescription(prevEntry, { state: currentState });
-            }
-        } catch (e) {
-            desc = 'Change';
-        }
-
-        undoStack.push({
-            state: currentState,
-            description: desc,
-            timestamp: new Date()
-        });
-        redoStack = []; // Clear redo when new change is made
-        if (undoStack.length > 50) undoStack.shift(); // Limit history
-    } catch (err) {
-        // Fallback to simple push
-        undoStack.push(captureState());
-        redoStack = [];
-    }
+function saveToUndo() {
+    undoStack.push(captureState());
+    redoStack = [];
+    if (undoStack.length > 50) undoStack.shift();
 }
 
 function undoChange() {
     if (undoStack.length > 0) {
-        redoStack.push({
-            state: captureState(),
-            description: 'Redo point',
-            timestamp: new Date()
-        });
-        var prevEntry = undoStack.pop();
-        restoreState(prevEntry);
-        if (undoHistoryOpen) updateUndoHistoryUI();
+        redoStack.push(captureState());
+        var prevState = undoStack.pop();
+        restoreState(prevState);
     } else {
         alert('Nothing to undo');
     }
@@ -3760,103 +3674,20 @@ function undoChange() {
 
 function redoChange() {
     if (redoStack.length > 0) {
-        undoStack.push({
-            state: captureState(),
-            description: 'Undo point',
-            timestamp: new Date()
-        });
-        var nextEntry = redoStack.pop();
-        restoreState(nextEntry);
-        if (undoHistoryOpen) updateUndoHistoryUI();
+        undoStack.push(captureState());
+        var nextState = redoStack.pop();
+        restoreState(nextState);
     } else {
         alert('Nothing to redo');
     }
 }
 
-function toggleUndoHistory() {
-    var dropdown = document.getElementById('undoHistoryDropdown');
-    if (!dropdown) return;
-
-    undoHistoryOpen = !undoHistoryOpen;
-    dropdown.style.display = undoHistoryOpen ? 'block' : 'none';
-
-    if (undoHistoryOpen) {
-        updateUndoHistoryUI();
-    }
-}
-
-function updateUndoHistoryUI() {
-    var list = document.getElementById('undoHistoryList');
-    var countLabel = document.getElementById('undoCountLabel');
-    if (!list) return;
-
-    if (undoStack.length === 0) {
-        list.innerHTML = '<div style="padding:12px; color:#888; text-align:center; font-size:11px;">No changes yet</div>';
-        if (countLabel) countLabel.textContent = '';
-        return;
-    }
-
-    var html = '';
-    // Show most recent first
-    for (var i = undoStack.length - 1; i >= 0; i--) {
-        var entry = undoStack[i];
-        var stepsAgo = undoStack.length - i;
-        var timeStr = entry.timestamp ? formatTime(entry.timestamp) : '';
-
-        html += '<div onclick="undoToPoint(' + i + ')" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee; font-size:11px; transition:background 0.15s;" onmouseover="this.style.background=\'#e8f4fd\'" onmouseout="this.style.background=\'\'"><span style="color:#888; margin-right:8px;">' + stepsAgo + '.</span><span style="color:#2980b9; font-weight:bold;">' + (entry.description || 'Change') + '</span><span style="float:right; color:#aaa; font-size:10px;">' + timeStr + '</span></div>';
-    }
-
-    list.innerHTML = html;
-    if (countLabel) countLabel.textContent = undoStack.length + ' change(s)';
-}
-
-function undoToPoint(index) {
-    // Save current state to redo
-    redoStack.push({
-        state: captureState(),
-        description: 'Before jump',
-        timestamp: new Date()
-    });
-
-    // Restore the state at that index
-    if (undoStack[index]) {
-        restoreState(undoStack[index]);
-    }
-
-    // Remove all entries after this point
-    undoStack = undoStack.slice(0, index);
-
-    toggleUndoHistory(); // Close dropdown
-}
-
-// Close undo dropdown when clicking outside
-document.addEventListener('click', function(e) {
-    try {
-        if (!undoHistoryOpen) return;
-        var dropdown = document.getElementById('undoHistoryDropdown');
-        if (!dropdown) return;
-
-        // Check if click is inside dropdown or on toggle button
-        var target = e.target;
-        while (target) {
-            if (target === dropdown) return;
-            if (target.getAttribute && target.getAttribute('onclick') && target.getAttribute('onclick').indexOf('toggleUndoHistory') !== -1) return;
-            target = target.parentElement;
-        }
-
-        undoHistoryOpen = false;
-        dropdown.style.display = 'none';
-    } catch (err) {
-        // Ignore errors
-    }
-});
-
 function resetToOriginal() {
     var confirmation = prompt('Type "yes" to reset all changes back to the original schedule:');
     if (confirmation && confirmation.toLowerCase().trim() === 'yes') {
         if (originalState) {
-            saveToUndo('Before reset to original');
-            restoreState({ state: originalState });
+            saveToUndo();
+            restoreState(originalState);
             alert('Schedule reset to original!');
         } else {
             alert('Original state not available. Refresh the page from the main app.');
@@ -4145,176 +3976,7 @@ for (var di = 0; di < dragItems.length; di++) {
         e.dataTransfer.effectAllowed = 'copy';
     });
 
-    // Click handler for Quick Apply mode
-    dragItems[di].addEventListener('click', function(e) {
-        try {
-            toggleStickyMode(this);
-        } catch (err) {
-            console.error('Quick Apply error:', err);
-        }
-    });
 }
-
-// Quick Apply (Sticky) mode variables
-var stickyShift = null;
-var stickyType = null;
-var stickyElement = null;
-var lastClickedCell = null;
-
-function toggleStickyMode(element) {
-    var value = element.getAttribute('data-value');
-    var type = element.getAttribute('data-type') || 'timeoff';
-
-    // If clicking the same item, deactivate
-    if (stickyElement === element) {
-        exitStickyMode();
-        return;
-    }
-
-    // Deactivate previous if any
-    if (stickyElement) {
-        stickyElement.classList.remove('sticky-selected');
-    }
-
-    // Activate this one
-    stickyShift = value;
-    stickyType = type;
-    stickyElement = element;
-    lastClickedCell = null;
-    element.classList.add('sticky-selected');
-
-    // Show instruction bar
-    var bar = document.getElementById('stickyModeBar');
-    var nameSpan = document.getElementById('stickyShiftName');
-    if (bar && nameSpan) {
-        nameSpan.textContent = value;
-        bar.style.display = 'block';
-    }
-
-    // Clear any range selection
-    clearRangeSelection();
-}
-
-function exitStickyMode() {
-    if (stickyElement) {
-        stickyElement.classList.remove('sticky-selected');
-    }
-    stickyShift = null;
-    stickyType = null;
-    stickyElement = null;
-    lastClickedCell = null;
-
-    var bar = document.getElementById('stickyModeBar');
-    if (bar) bar.style.display = 'none';
-
-    clearRangeSelection();
-}
-
-function clearRangeSelection() {
-    var selected = document.querySelectorAll('.shift-cell.range-selected');
-    for (var i = 0; i < selected.length; i++) {
-        selected[i].classList.remove('range-selected');
-    }
-}
-
-function applyStickyShiftToCell(cell) {
-    if (!stickyShift) return;
-
-    saveToUndo();
-
-    // Apply the sticky shift based on type
-    if (stickyType === 'shift') {
-        // Work shift - ask about type
-        var shiftChoice = prompt('Is this shift a:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
-
-        if (shiftChoice === '2') {
-            cell.textContent = 'SW-' + stickyShift;
-        } else if (shiftChoice === '3') {
-            cell.textContent = 'OT-' + stickyShift;
-        } else if (shiftChoice === '4') {
-            cell.textContent = 'DT-' + stickyShift;
-        } else {
-            cell.textContent = stickyShift;
-        }
-    } else if (stickyType === 'compwork') {
-        showDeskPopup(cell);
-        return;
-    } else if (stickyType === 'special') {
-        var specChoice = prompt(stickyShift + ' - Is this:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
-        if (specChoice === '1') {
-            cell.textContent = 'C-' + stickyShift;
-        } else if (specChoice === '2') {
-            cell.textContent = 'OT-' + stickyShift;
-        } else {
-            cell.textContent = stickyShift;
-        }
-    } else {
-        // Time off - apply directly
-        cell.textContent = stickyShift;
-    }
-
-    updateCellColor(cell);
-}
-
-function applyStickyToRange(startCell, endCell) {
-    // Get all shift cells in order
-    var allCells = document.querySelectorAll('.shift-cell');
-    var allCellsArr = [];
-    for (var c = 0; c < allCells.length; c++) { allCellsArr.push(allCells[c]); }
-
-    var startIdx = -1;
-    var endIdx = -1;
-    for (var idx = 0; idx < allCellsArr.length; idx++) {
-        if (allCellsArr[idx] === startCell) startIdx = idx;
-        if (allCellsArr[idx] === endCell) endIdx = idx;
-    }
-
-    if (startIdx === -1 || endIdx === -1) return;
-
-    // Ensure start < end
-    if (startIdx > endIdx) {
-        var temp = startIdx;
-        startIdx = endIdx;
-        endIdx = temp;
-    }
-
-    saveToUndo();
-
-    // For time off items, apply directly to all cells without prompts
-    if (stickyType === 'timeoff') {
-        for (var i = startIdx; i <= endIdx; i++) {
-            allCellsArr[i].textContent = stickyShift;
-            updateCellColor(allCellsArr[i]);
-        }
-    } else {
-        // For shifts, prompt once and apply to all
-        var prefix = '';
-        if (stickyType === 'shift') {
-            var shiftChoice = prompt('Apply ' + stickyShift + ' to ' + (endIdx - startIdx + 1) + ' cells as:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
-            if (shiftChoice === '2') prefix = 'SW-';
-            else if (shiftChoice === '3') prefix = 'OT-';
-            else if (shiftChoice === '4') prefix = 'DT-';
-        } else if (stickyType === 'special') {
-            var specChoice = prompt('Apply ' + stickyShift + ' to ' + (endIdx - startIdx + 1) + ' cells as:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
-            if (specChoice === '1') prefix = 'C-';
-            else if (specChoice === '2') prefix = 'OT-';
-        }
-
-        for (var j = startIdx; j <= endIdx; j++) {
-            allCellsArr[j].textContent = prefix + stickyShift;
-            updateCellColor(allCellsArr[j]);
-        }
-    }
-
-    clearRangeSelection();
-}
-
-// Escape key to exit sticky mode
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && stickyShift) {
-        exitStickyMode();
-    }
-});
 
 var shiftCells = document.querySelectorAll('.shift-cell');
 for (var sc = 0; sc < shiftCells.length; sc++) {
@@ -4982,55 +4644,6 @@ function goBackToMain() {
 window.addEventListener('DOMContentLoaded', function() {
     populateLineSelector();
 });
-
-// Event delegation for Quick Apply mode on shift cells
-document.addEventListener('click', function(e) {
-    try {
-        // Only process if in sticky mode
-        if (!stickyShift) return;
-
-        // Check if clicked element is a shift cell
-        var cell = e.target;
-        if (!cell.classList || !cell.classList.contains('shift-cell')) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Shift+click for range selection
-        if (e.shiftKey && lastClickedCell) {
-            var allCells = document.querySelectorAll('.shift-cell');
-            var allCellsArr = [];
-            for (var c = 0; c < allCells.length; c++) { allCellsArr.push(allCells[c]); }
-
-            var startIdx = -1;
-            var endIdx = -1;
-            for (var idx = 0; idx < allCellsArr.length; idx++) {
-                if (allCellsArr[idx] === lastClickedCell) startIdx = idx;
-                if (allCellsArr[idx] === cell) endIdx = idx;
-            }
-
-            if (startIdx > endIdx) {
-                var temp = startIdx;
-                startIdx = endIdx;
-                endIdx = temp;
-            }
-
-            clearRangeSelection();
-            for (var r = startIdx; r <= endIdx; r++) {
-                allCellsArr[r].classList.add('range-selected');
-            }
-
-            applyStickyToRange(lastClickedCell, cell);
-            lastClickedCell = null;
-        } else {
-            clearRangeSelection();
-            applyStickyShiftToCell(cell);
-            lastClickedCell = cell;
-        }
-    } catch (err) {
-        // Ignore errors
-    }
-}, true); // Use capture phase to intercept before contenteditable
 </script>
 </body>
 </html>`;
