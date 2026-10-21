@@ -182,9 +182,11 @@
     let currentCalendarLine = null;
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // CRITICAL: Load all settings from Firebase FIRST before loading patterns
-        // This ensures desk assignments are properly synced with the color manager
-        console.log('[BidApp] Loading settings from Firebase...');
+        // Start cloud data loading FIRST (doesn't depend on settings)
+        console.log('[BidApp] Starting parallel data loading...');
+        var cloudPromise = initCloud();
+
+        // Load settings (needed before patterns)
         try {
             await Promise.all([
                 loadColorSettings(),
@@ -192,21 +194,17 @@
                 loadGroupLabels(),
                 loadDeskAssignments()
             ]);
-            console.log('[BidApp] All settings loaded successfully');
         } catch (err) {
-            console.warn('[BidApp] Some settings failed to load, using defaults:', err);
+            console.warn('[BidApp] Some settings failed:', err);
         }
 
-        // Apply loaded desk assignments to PatternLoader BEFORE loading patterns
-        // This ensures the color mapping is correct during pattern transformation
+        // Apply desk assignments to PatternLoader
         if (typeof PatternLoader !== 'undefined' && PatternLoader.setCustomAssignments) {
             PatternLoader.setCustomAssignments(deskAssignments);
-            console.log('[BidApp] Applied desk assignments to PatternLoader:', Object.keys(deskAssignments).length, 'desks');
         }
 
-        // Load patterns and cloud data IN PARALLEL for faster startup
+        // Load patterns (cloud data still loading in background)
         var patternPromise = null;
-        var cloudPromise = initCloud(); // Start cloud loading immediately
 
         if (typeof PatternLoader !== 'undefined' && (!window.ANNUAL_BID || window.ANNUAL_BID.length === 0)) {
             console.log('[BidApp] Loading patterns...');
