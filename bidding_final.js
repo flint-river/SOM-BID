@@ -3508,18 +3508,10 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
         <b>Give shift:</b> Click "Give Shift Mode" button, double-click YOUR cell (red border), click THEIR cell = you give it up.
         <b>UNDO/REDO/RESET</b> for changes. <b>Ctrl+S</b> to download.
     </div>
-    <div id="stickyModeBar" class="no-print" style="display:none; background:#ffe4e1; border:2px solid #e74c3c; border-radius:6px; padding:10px 15px; margin:5px 0; font-size:12px;">
-        <b style="color:#c0392b;">🎯 QUICK APPLY MODE:</b> <span id="stickyShiftName" style="background:#ff69b4; padding:2px 8px; border-radius:4px; font-weight:bold;"></span> selected.
-        <b>Click</b> any cell to apply. <b>Shift+Click</b> to select a range.
-        Press <b>ESC</b> or click the shift again to exit.
-    </div>
     <div class="no-print" style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
         <b>SAVE REMINDER:</b> Press <b>Ctrl+S</b> to save this file to your <b>Downloads</b> folder.
         <span style="color:#c0392b;"><b>VDI Users:</b></span> Downloads folder is cleared when you sign out!
         After saving, <b>move the file to your Desktop</b> or a network drive to keep it permanently.
-    </div>
-    <div class="no-print" style="background:#e8f4fd; border:1px solid #3498db; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
-        <b style="color:#2980b9;">💡 QUICK APPLY TIP:</b> <b>Click</b> any shift below to enter Quick Apply mode - then <b>click cells</b> to apply repeatedly, or <b>Shift+Click</b> for a range. Press <b>ESC</b> to exit.
     </div>
     <div class="drag-palette no-print">
         <span style="font-weight:bold; margin-right:5px;">Time Off:</span>
@@ -3610,9 +3602,9 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
 
             // Comparison row (hidden by default)
             html += '<tr class="compare-row" data-month="' + monthIdx + '" data-year="' + year + '"><td class="month-label">CMP</td>';
-            for (let d = 1; d <= 31; d++) {
+            for (var d = 1; d <= 31; d++) {
                 if (d <= daysInMonth) {
-                    const dateStr = year + '-' + (monthIdx + 1) + '-' + d;
+                    var dateStr = year + '-' + (monthIdx + 1) + '-' + d;
                     html += '<td class="compare-cell" data-date="' + dateStr + '">--</td>';
                 } else {
                     html += '<td style="background:#ccc;"></td>';
@@ -3623,8 +3615,8 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
 
         // Footer row
         html += '<tr><td class="month-label"></td>';
-        for (let d = 1; d <= 31; d++) {
-            html += '<td class="day-num">' + d + '</td>';
+        for (var d2 = 1; d2 <= 31; d2++) {
+            html += '<td class="day-num">' + d2 + '</td>';
         }
         html += '<td class="month-label"></td></tr>\n';
 
@@ -3632,11 +3624,10 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
 </div>
 
 <script>
-// Undo/Redo history with descriptions
+// Undo/Redo history
 var undoStack = [];
 var redoStack = [];
 var originalState = null;
-var undoHistoryOpen = false;
 
 // Save original state on page load
 window.addEventListener('DOMContentLoaded', function() {
@@ -3649,15 +3640,13 @@ function captureState() {
     for (var i = 0; i < cells.length; i++) {
         result.push({
             text: cells[i].textContent,
-            classes: cells[i].className,
-            date: cells[i].getAttribute('data-date')
+            classes: cells[i].className
         });
     }
     return result;
 }
 
-function restoreState(stateData) {
-    var state = stateData.state || stateData; // Handle both old and new format
+function restoreState(state) {
     var cells = document.querySelectorAll('.shift-cell');
     for (var i = 0; i < cells.length; i++) {
         if (state[i]) {
@@ -3665,186 +3654,40 @@ function restoreState(stateData) {
             cells[i].className = state[i].classes;
         }
     }
-    updateUndoHistoryUI();
 }
 
-function getChangeDescription(oldState, newState) {
-    // Safety check
-    if (!oldState || !newState || !Array.isArray(oldState) || !Array.isArray(newState)) {
-        return 'Change';
-    }
-
-    // Find what changed between states
-    var changes = [];
-    for (var i = 0; i < oldState.length && i < newState.length; i++) {
-        if (oldState[i] && newState[i] && oldState[i].text !== newState[i].text) {
-            var date = oldState[i].date || '';
-            var dateFormatted = date ? formatDateShort(date) : '?';
-            changes.push({
-                date: dateFormatted,
-                from: oldState[i].text || '',
-                to: newState[i].text || ''
-            });
-        }
-    }
-
-    if (changes.length === 0) return 'No changes';
-    if (changes.length === 1) {
-        return changes[0].from + ' → ' + changes[0].to + ' (' + changes[0].date + ')';
-    }
-    if (changes.length <= 3) {
-        return changes.map(c => c.to).join(', ') + ' (' + changes.length + ' cells)';
-    }
-    return changes[0].to + ' applied to ' + changes.length + ' cells';
-}
-
-function formatDateShort(dateStr) {
-    if (!dateStr) return '';
-    var parts = dateStr.split('-');
-    if (parts.length >= 2) {
-        return parts[1] + '/' + parts[2];
-    }
-    return dateStr;
-}
-
-function saveToUndo(description) {
-    var currentState = captureState();
-
-    undoStack.push({
-        state: currentState,
-        description: description || 'Change',
-        timestamp: new Date()
-    });
+function saveToUndo() {
+    undoStack.push(captureState());
     redoStack = []; // Clear redo when new change is made
     if (undoStack.length > 50) undoStack.shift(); // Limit history
 }
 
-function updateLastUndoDescription() {
-    if (undoStack.length === 0) return;
-
-    var lastEntry = undoStack[undoStack.length - 1];
-    if (lastEntry.description) return; // Already has description
-
-    var currentState = captureState();
-    lastEntry.description = getChangeDescription(lastEntry.state, currentState);
-}
-
 function undoChange() {
     if (undoStack.length > 0) {
-        redoStack.push({
-            state: captureState(),
-            description: 'Redo point',
-            timestamp: new Date()
-        });
-        var prevEntry = undoStack.pop();
-        restoreState(prevEntry);
+        redoStack.push(captureState());
+        var prevState = undoStack.pop();
+        restoreState(prevState);
     } else {
         alert('Nothing to undo');
     }
 }
 
-function undoToPoint(index) {
-    // Undo all changes from current back to index (inclusive)
-    var currentState = captureState();
-
-    // Save all states being undone to redo stack
-    for (var i = undoStack.length - 1; i >= index; i--) {
-        redoStack.push(undoStack[i]);
-    }
-
-    // Remove from undo stack
-    undoStack = undoStack.slice(0, index);
-
-    // Restore the state before the selected point
-    if (index > 0) {
-        restoreState(undoStack[index - 1]);
-    } else {
-        restoreState({ state: originalState });
-    }
-
-    toggleUndoHistory(); // Close dropdown
-}
-
 function redoChange() {
     if (redoStack.length > 0) {
-        undoStack.push({
-            state: captureState(),
-            description: 'Undo point',
-            timestamp: new Date()
-        });
-        var nextEntry = redoStack.pop();
-        restoreState(nextEntry);
+        undoStack.push(captureState());
+        var nextState = redoStack.pop();
+        restoreState(nextState);
     } else {
         alert('Nothing to redo');
     }
 }
 
-function toggleUndoHistory() {
-    var dropdown = document.getElementById('undoHistoryDropdown');
-    if (!dropdown) return;
-
-    undoHistoryOpen = !undoHistoryOpen;
-    dropdown.style.display = undoHistoryOpen ? 'block' : 'none';
-
-    if (undoHistoryOpen) {
-        updateUndoHistoryUI();
-    }
-}
-
-function updateUndoHistoryUI() {
-    var list = document.getElementById('undoHistoryList');
-    var countLabel = document.getElementById('undoCountLabel');
-    if (!list) return;
-
-    if (undoStack.length === 0) {
-        list.innerHTML = '<div style="padding:12px; color:#888; text-align:center; font-size:11px;">No changes yet</div>';
-        if (countLabel) countLabel.textContent = '';
-        return;
-    }
-
-    var html = '';
-    // Show most recent first
-    for (var i = undoStack.length - 1; i >= 0; i--) {
-        var entry = undoStack[i];
-        var stepsAgo = undoStack.length - i;
-        var timeStr = entry.timestamp ? formatTime(entry.timestamp) : '';
-
-        html += '<div onclick="undoToPoint(' + i + ')" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee; font-size:11px; transition:background 0.15s;" onmouseover="this.style.background=\'#e8f4fd\'" onmouseout="this.style.background=\'\'"><span style="color:#888; margin-right:8px;">' + stepsAgo + '.</span><span style="color:#2980b9; font-weight:bold;">' + (entry.description || 'Change') + '</span><span style="float:right; color:#aaa; font-size:10px;">' + timeStr + '</span></div>';
-    }
-
-    list.innerHTML = html;
-    if (countLabel) countLabel.textContent = undoStack.length + ' change(s) in history';
-}
-
-function formatTime(date) {
-    var h = date.getHours();
-    var m = date.getMinutes();
-    var ampm = h >= 12 ? 'pm' : 'am';
-    var hour = h % 12 || 12;
-    return hour + ':' + (m < 10 ? '0' : '') + m + ampm;
-}
-
-// Close undo dropdown when clicking outside
-document.addEventListener('click', function(e) {
-    try {
-        if (typeof undoHistoryOpen !== 'undefined' && undoHistoryOpen && e.target.closest) {
-            if (!e.target.closest('#undoHistoryDropdown') && !e.target.closest('[onclick*="toggleUndoHistory"]')) {
-                undoHistoryOpen = false;
-                var dropdown = document.getElementById('undoHistoryDropdown');
-                if (dropdown) dropdown.style.display = 'none';
-            }
-        }
-    } catch(err) {
-        // Ignore
-    }
-});
-
 function resetToOriginal() {
     var confirmation = prompt('Type "yes" to reset all changes back to the original schedule:');
     if (confirmation && confirmation.toLowerCase().trim() === 'yes') {
         if (originalState) {
-            saveToUndo('Before reset to original'); // Save current state so they can undo the reset
-            restoreState({ state: originalState });
+            saveToUndo();
+            restoreState(originalState);
             alert('Schedule reset to original!');
         } else {
             alert('Original state not available. Refresh the page from the main app.');
@@ -3855,8 +3698,10 @@ function resetToOriginal() {
 }
 
 function showTab(tabId, btn) {
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    var tabs = document.querySelectorAll('.tab-content');
+    for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('active'); }
+    var btns = document.querySelectorAll('.tab-btn');
+    for (var j = 0; j < btns.length; j++) { btns[j].classList.remove('active'); }
     document.getElementById(tabId).classList.add('active');
     if (btn) {
         btn.classList.add('active');
@@ -3867,7 +3712,8 @@ function showTab(tabId, btn) {
 
 function printTab(tabId) {
     // Mark the tab to print
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('print-this'));
+    var tabs = document.querySelectorAll('.tab-content');
+    for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('print-this'); }
     document.getElementById(tabId).classList.add('print-this');
 
     // Set portrait mode for summary tab
@@ -3878,7 +3724,7 @@ function printTab(tabId) {
     window.print();
 
     // Clean up after printing
-    setTimeout(() => {
+    setTimeout(function() {
         document.getElementById(tabId).classList.remove('print-this');
         document.body.classList.remove('print-summary');
     }, 500);
@@ -3894,13 +3740,14 @@ function printYearOverview() {
     document.body.classList.add('print-' + paperSize);
 
     // Mark yearview tab to print
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('print-this'));
+    var tabs = document.querySelectorAll('.tab-content');
+    for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('print-this'); }
     document.getElementById('yearview').classList.add('print-this');
 
     window.print();
 
     // Clean up after printing
-    setTimeout(() => {
+    setTimeout(function() {
         document.getElementById('yearview').classList.remove('print-this');
         document.body.classList.remove('print-letter', 'print-legal');
     }, 500);
@@ -3951,33 +3798,36 @@ function updateCellColor(cell) {
 }
 
 // Dynamic coloring for all editable shift cells
-document.querySelectorAll('[contenteditable="true"]').forEach(cell => {
-    if (cell.classList.contains('work') || cell.classList.contains('off') || cell.classList.contains('shift-cell') || cell.closest('.pattern-table') || cell.closest('.schedule-table')) {
-        cell.addEventListener('focus', function() {
-            if (!this.dataset.editing) {
-                this.dataset.editing = 'true';
-                this.dataset.originalValue = this.textContent;
-            }
-        });
+var editableCells = document.querySelectorAll('[contenteditable="true"]');
+for (var ec = 0; ec < editableCells.length; ec++) {
+    (function(cell) {
+        if (cell.classList.contains('work') || cell.classList.contains('off') || cell.classList.contains('shift-cell') || cell.closest('.pattern-table') || cell.closest('.schedule-table')) {
+            cell.addEventListener('focus', function() {
+                if (!this.dataset.editing) {
+                    this.dataset.editing = 'true';
+                    this.dataset.originalValue = this.textContent;
+                }
+            });
 
-        cell.addEventListener('input', function() {
-            updateCellColor(this);
-        });
+            cell.addEventListener('input', function() {
+                updateCellColor(this);
+            });
 
-        cell.addEventListener('blur', function() {
-            var val = this.textContent.trim();
-            if (val === '') {
-                this.textContent = '--';
-            }
-            updateCellColor(this);
-            if (this.dataset.editing && this.dataset.originalValue !== this.textContent) {
-                saveToUndo();
-            }
-            delete this.dataset.editing;
-            delete this.dataset.originalValue;
-        });
-    }
-});
+            cell.addEventListener('blur', function() {
+                var val = this.textContent.trim();
+                if (val === '') {
+                    this.textContent = '--';
+                }
+                updateCellColor(this);
+                if (this.dataset.editing && this.dataset.originalValue !== this.textContent) {
+                    saveToUndo();
+                }
+                delete this.dataset.editing;
+                delete this.dataset.originalValue;
+            });
+        }
+    })(editableCells[ec]);
+}
 
 // Desk list for COMP WORK popup
 var ALL_DESKS = ${JSON.stringify(allDesksList)};
@@ -4126,167 +3976,7 @@ for (var di = 0; di < dragItems.length; di++) {
         e.dataTransfer.effectAllowed = 'copy';
     });
 
-    // Click handler for sticky/quick-apply mode - DISABLED FOR DEBUGGING
-    // dragItems[di].addEventListener('click', function(e) {
-    //     toggleStickyMode(this);
-    // });
 }
-
-// Sticky mode variables
-var stickyShift = null;
-var stickyType = null;
-var stickyElement = null;
-var lastClickedCell = null;
-
-function toggleStickyMode(element) {
-    var value = element.getAttribute('data-value');
-    var type = element.getAttribute('data-type') || 'timeoff';
-
-    // If clicking the same item, deactivate
-    if (stickyElement === element) {
-        exitStickyMode();
-        return;
-    }
-
-    // Deactivate previous if any
-    if (stickyElement) {
-        stickyElement.classList.remove('sticky-selected');
-    }
-
-    // Activate this one
-    stickyShift = value;
-    stickyType = type;
-    stickyElement = element;
-    lastClickedCell = null;
-    element.classList.add('sticky-selected');
-
-    // Show instruction bar
-    var bar = document.getElementById('stickyModeBar');
-    var nameSpan = document.getElementById('stickyShiftName');
-    if (bar && nameSpan) {
-        nameSpan.textContent = value;
-        bar.style.display = 'block';
-    }
-
-    // Clear any range selection
-    clearRangeSelection();
-}
-
-function exitStickyMode() {
-    if (stickyElement) {
-        stickyElement.classList.remove('sticky-selected');
-    }
-    stickyShift = null;
-    stickyType = null;
-    stickyElement = null;
-    lastClickedCell = null;
-
-    var bar = document.getElementById('stickyModeBar');
-    if (bar) bar.style.display = 'none';
-
-    clearRangeSelection();
-}
-
-function clearRangeSelection() {
-    var selected = document.querySelectorAll('.shift-cell.range-selected');
-    for (var i = 0; i < selected.length; i++) {
-        selected[i].classList.remove('range-selected');
-    }
-}
-
-function applyStickyShiftToCell(cell) {
-    if (!stickyShift) return;
-
-    saveToUndo();
-
-    // Apply the sticky shift based on type
-    if (stickyType === 'shift') {
-        // Work shift - ask about type
-        var shiftChoice = prompt('Is this shift a:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
-
-        if (shiftChoice === '2') {
-            cell.textContent = 'SW-' + stickyShift;
-        } else if (shiftChoice === '3') {
-            cell.textContent = 'OT-' + stickyShift;
-        } else if (shiftChoice === '4') {
-            cell.textContent = 'DT-' + stickyShift;
-        } else {
-            cell.textContent = stickyShift;
-        }
-    } else if (stickyType === 'compwork') {
-        showDeskPopup(cell);
-        return;
-    } else if (stickyType === 'special') {
-        var specChoice = prompt(stickyShift + ' - Is this:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
-        if (specChoice === '1') {
-            cell.textContent = 'C-' + stickyShift;
-        } else if (specChoice === '2') {
-            cell.textContent = 'OT-' + stickyShift;
-        } else {
-            cell.textContent = stickyShift;
-        }
-    } else {
-        // Time off - apply directly
-        cell.textContent = stickyShift;
-    }
-
-    updateCellColor(cell);
-}
-
-function applyStickyToRange(startCell, endCell) {
-    // Get all shift cells in order
-    var allCells = Array.from(document.querySelectorAll('.shift-cell'));
-    var startIdx = allCells.indexOf(startCell);
-    var endIdx = allCells.indexOf(endCell);
-
-    if (startIdx === -1 || endIdx === -1) return;
-
-    // Ensure start < end
-    if (startIdx > endIdx) {
-        var temp = startIdx;
-        startIdx = endIdx;
-        endIdx = temp;
-    }
-
-    saveToUndo();
-
-    // For time off items, apply directly to all cells without prompts
-    if (stickyType === 'timeoff') {
-        for (var i = startIdx; i <= endIdx; i++) {
-            allCells[i].textContent = stickyShift;
-            updateCellColor(allCells[i]);
-        }
-    } else {
-        // For shifts, prompt once and apply to all
-        var prefix = '';
-        if (stickyType === 'shift') {
-            var shiftChoice = prompt('Apply ' + stickyShift + ' to ' + (endIdx - startIdx + 1) + ' cells as:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
-            if (shiftChoice === '2') prefix = 'SW-';
-            else if (shiftChoice === '3') prefix = 'OT-';
-            else if (shiftChoice === '4') prefix = 'DT-';
-        } else if (stickyType === 'special') {
-            var specChoice = prompt('Apply ' + stickyShift + ' to ' + (endIdx - startIdx + 1) + ' cells as:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
-            if (specChoice === '1') prefix = 'C-';
-            else if (specChoice === '2') prefix = 'OT-';
-        }
-
-        for (var j = startIdx; j <= endIdx; j++) {
-            allCells[j].textContent = prefix + stickyShift;
-            updateCellColor(allCells[j]);
-        }
-    }
-
-    clearRangeSelection();
-}
-
-// Escape key to exit sticky mode - DISABLED FOR DEBUGGING
-/*
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && stickyShift) {
-        exitStickyMode();
-    }
-});
-*/
 
 var shiftCells = document.querySelectorAll('.shift-cell');
 for (var sc = 0; sc < shiftCells.length; sc++) {
@@ -4295,46 +3985,6 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
         e.preventDefault();
         selectMainCellForSwap(this);
     });
-
-    // Click handler for sticky mode - DISABLED FOR DEBUGGING
-    /*
-    shiftCells[sc].addEventListener('click', function(e) {
-        // Only handle if in sticky mode
-        if (!stickyShift) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Shift+click for range selection
-        if (e.shiftKey && lastClickedCell) {
-            // Select range
-            var allCells = Array.from(document.querySelectorAll('.shift-cell'));
-            var startIdx = allCells.indexOf(lastClickedCell);
-            var endIdx = allCells.indexOf(this);
-
-            if (startIdx > endIdx) {
-                var temp = startIdx;
-                startIdx = endIdx;
-                endIdx = temp;
-            }
-
-            // Highlight range
-            clearRangeSelection();
-            for (var r = startIdx; r <= endIdx; r++) {
-                allCells[r].classList.add('range-selected');
-            }
-
-            // Apply to range
-            applyStickyToRange(lastClickedCell, this);
-            lastClickedCell = null;
-        } else {
-            // Single click - apply to this cell
-            clearRangeSelection();
-            applyStickyShiftToCell(this);
-            lastClickedCell = this;
-        }
-    });
-    */
 
     // Mousedown - only interfere with contenteditable in swap mode
     shiftCells[sc].addEventListener('mousedown', function(e) {
@@ -4586,7 +4236,11 @@ function addSwapPartner() {
     }
 
     // Check if already added
-    if (swapPartners.find(p => p.lineKey === lineKey)) {
+    var alreadyExists = false;
+    for (var i = 0; i < swapPartners.length; i++) {
+        if (swapPartners[i].lineKey === lineKey) { alreadyExists = true; break; }
+    }
+    if (alreadyExists) {
         alert('This line is already added as a swap partner');
         return;
     }
@@ -4623,7 +4277,10 @@ function addSwapPartner() {
 }
 
 function setActivePartner(lineKey) {
-    var partner = swapPartners.find(p => p.lineKey === lineKey);
+    var partner = null;
+    for (var i = 0; i < swapPartners.length; i++) {
+        if (swapPartners[i].lineKey === lineKey) { partner = swapPartners[i]; break; }
+    }
     if (!partner) return;
 
     activePartner = partner;
@@ -4635,7 +4292,11 @@ function setActivePartner(lineKey) {
 }
 
 function removeSwapPartner(lineKey) {
-    swapPartners = swapPartners.filter(p => p.lineKey !== lineKey);
+    var filtered = [];
+    for (var i = 0; i < swapPartners.length; i++) {
+        if (swapPartners[i].lineKey !== lineKey) { filtered.push(swapPartners[i]); }
+    }
+    swapPartners = filtered;
 
     if (activePartner && activePartner.lineKey === lineKey) {
         activePartner = null;
@@ -4664,8 +4325,12 @@ function updatePartnersPanel() {
     panel.style.display = 'block';
 
     // Calculate totals
-    var totalGive = swapPartners.reduce((sum, p) => sum + p.give, 0);
-    var totalReceive = swapPartners.reduce((sum, p) => sum + p.receive, 0);
+    var totalGive = 0;
+    var totalReceive = 0;
+    for (var i = 0; i < swapPartners.length; i++) {
+        totalGive += swapPartners[i].give;
+        totalReceive += swapPartners[i].receive;
+    }
     var netBalance = totalReceive - totalGive;
     var balanceColor = netBalance > 0 ? '#27ae60' : netBalance < 0 ? '#e74c3c' : '#888';
 
