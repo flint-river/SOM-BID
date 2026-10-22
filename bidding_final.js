@@ -3802,9 +3802,11 @@ function printYearOverview() {
     // PDF Generation
     var title = document.querySelector('.title');
     var titleText = title ? title.textContent : 'Year Overview';
+    // For landscape: width is the longer dimension, height is 8.5
     var pageWidth = (paperSize === 'legal') ? 14 : 11;
     var pageHeight = 8.5;
-    var margin = 0.2;
+    var margin = 0.15;
+    var pdfFormat = (paperSize === 'legal') ? 'legal' : 'letter';
 
     var yearview = document.getElementById('yearview');
     var table = yearview.querySelector('.year-table');
@@ -3856,7 +3858,7 @@ function printYearOverview() {
         filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 1, useCORS: true, backgroundColor: '#ffffff', width: contentWidth, height: contentHeight },
-        jsPDF: { unit: 'in', format: [pageWidth, pageHeight], orientation: 'landscape' }
+        jsPDF: { unit: 'in', format: pdfFormat, orientation: 'landscape' }
     };
 
     html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(function(pdf) {
