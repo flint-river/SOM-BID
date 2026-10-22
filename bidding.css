@@ -408,6 +408,11 @@
         .btn-legend:hover { background: #475569; color: #fff; }
         .btn-admin { background: #f0a500; color: #1a1a2e; }
 
+        /* Header Dropdown Menus */
+        .header-dropdown-menu a:hover {
+            background: #2d4a6f !important;
+        }
+
         /* Button Groups */
         .btn-group {
             display: inline-flex;

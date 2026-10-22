@@ -1812,6 +1812,34 @@ function isLineConfirmed(lineNbr) {
         document.getElementById('lineSummaryContent').innerHTML = html;
     }
 
+    // Header Dropdown Functions
+    function toggleHeaderDropdown(dropdownId) {
+        const dropdown = document.getElementById(dropdownId);
+        const allDropdowns = document.querySelectorAll('.header-dropdown-menu');
+
+        // Close all other dropdowns
+        allDropdowns.forEach(d => {
+            if (d.id !== dropdownId) {
+                d.style.display = 'none';
+            }
+        });
+
+        // Toggle this dropdown
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function closeHeaderDropdowns() {
+        const allDropdowns = document.querySelectorAll('.header-dropdown-menu');
+        allDropdowns.forEach(d => d.style.display = 'none');
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.header-dropdown')) {
+            closeHeaderDropdowns();
+        }
+    });
+
     function showLegend() {
         document.getElementById('legendModal').classList.add('show');
     }
@@ -10269,6 +10297,10 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     // Holiday filter functions
     window.toggleHolidayFilter = toggleHolidayFilter;
     window.clearHolidayFilters = clearHolidayFilters;
+
+    // Header dropdown functions
+    window.toggleHeaderDropdown = toggleHeaderDropdown;
+    window.closeHeaderDropdowns = closeHeaderDropdowns;
 
     // Your Edit standalone functions
     window.openYourEditStandalone = openYourEditStandalone;
