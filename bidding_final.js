@@ -3777,7 +3777,7 @@ function printYearOverview() {
     // Check if html2pdf is available
     if (typeof html2pdf === 'undefined') {
         // Fallback to standard print
-        var table = document.querySelector('.pattern-table');
+        var table = document.querySelector('.year-table');
         if (table) {
             var rows = table.getElementsByTagName('tr');
             var rowHeight = (paperSize === 'legal') ? '38px' : '34px';
@@ -3807,7 +3807,7 @@ function printYearOverview() {
     var margin = 0.2;
 
     var yearview = document.getElementById('yearview');
-    var table = yearview.querySelector('.pattern-table');
+    var table = yearview.querySelector('.year-table');
     if (!table) { alert('No table found'); return; }
 
     var btn = document.querySelector('button[onclick="printYearOverview()"]');
