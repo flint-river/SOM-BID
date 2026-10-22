@@ -3256,7 +3256,6 @@ function isLineConfirmed(lineNbr) {
 <head>
 <meta charset="UTF-8">
 <title>Line ${displayNum} - ${bidYear}/${bidYear + 1}</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; background: #fff; }
@@ -3508,7 +3507,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
             <option value="letter">8.5" x 11" (Letter)</option>
             <option value="legal">8.5" x 14" (Legal)</option>
         </select>
-        <button onclick="printYearOverview()" id="printBtn">Generate PDF to Print</button>
+        <button onclick="printYearOverview()">Print Year Overview</button>
     </div>
     <div class="instructions no-print">
         <b>Edit cells:</b> Click any cell to type, or drag from palettes. Shifts prompt for Regular/SWAP/OT/DT.
@@ -3772,87 +3771,42 @@ function printTab(tabId) {
 }
 
 function printYearOverview() {
-    var btn = document.getElementById('printBtn');
-    var originalText = btn.textContent;
-    btn.textContent = 'Generating PDF...';
-    btn.disabled = true;
-
     var paperSize = document.getElementById('paperSize').value;
-    var title = document.querySelector('.title');
-    var titleText = title ? title.textContent : 'Year Overview';
 
-    // Page dimensions in inches (landscape)
-    var pageWidth = (paperSize === 'legal') ? 14 : 11;
-    var pageHeight = 8.5;
-    var margin = 0.25;
-
-    // Create a clone of the content for PDF generation
-    var yearview = document.getElementById('yearview');
-    var table = yearview.querySelector('.pattern-table');
-    if (!table) {
-        alert('No table found to print');
-        return;
-    }
-
-    // Create wrapper for PDF
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'background:white; padding:0.15in; box-sizing:border-box;';
-
-    // Add title
-    var titleEl = document.createElement('h3');
-    titleEl.textContent = titleText;
-    titleEl.style.cssText = 'text-align:center; margin:0 0 0.1in 0; font-size:14pt; color:black;';
-    wrapper.appendChild(titleEl);
-
-    // Clone and style the table
-    var tableClone = table.cloneNode(true);
-    tableClone.style.cssText = 'width:100%; border-collapse:collapse; table-layout:fixed;';
-
-    // Calculate row height to fill page
-    // Page height minus margins minus title = usable height
-    var usableHeight = pageHeight - (margin * 2) - 0.4; // 0.4 for title
-    var rowCount = tableClone.rows.length || 14;
-    var rowHeight = (usableHeight / rowCount) + 'in';
-
-    // Style all rows and cells
-    var rows = tableClone.getElementsByTagName('tr');
-    for (var i = 0; i < rows.length; i++) {
-        rows[i].style.height = rowHeight;
-        var cells = rows[i].getElementsByTagName('td');
-        for (var j = 0; j < cells.length; j++) {
-            cells[j].style.cssText += 'border:1px solid #333; text-align:center; vertical-align:middle; font-size:10px; padding:2px;';
+    // Apply row height styling for print
+    var table = document.querySelector('.pattern-table');
+    if (table) {
+        var rows = table.getElementsByTagName('tr');
+        // Calculate row height: 8.5" page - 0.8" margins/title = 7.7" / 14 rows = 0.55" per row
+        var rowHeight = (paperSize === 'legal') ? '0.55in' : '0.5in';
+        for (var i = 0; i < rows.length; i++) {
+            rows[i].style.height = rowHeight;
         }
     }
 
-    wrapper.appendChild(tableClone);
+    // Add print class
+    document.body.classList.remove('print-letter', 'print-legal');
+    document.body.classList.add('print-' + paperSize);
+    document.getElementById('yearview').classList.add('print-this');
 
-    // Temporarily add to DOM (required for html2pdf)
-    document.body.appendChild(wrapper);
+    // Show reminder about paper size
+    setTimeout(function() {
+        alert('IMPORTANT: In the print dialog, make sure to:\\n\\n1. Set Paper Size to ' + (paperSize === 'legal' ? 'Legal (8.5 x 14)' : 'Letter (8.5 x 11)') + '\\n2. Set Orientation to Landscape\\n3. Check "Background graphics" for colors\\n4. Set Margins to "None" or "Minimum"');
+        window.print();
+    }, 100);
 
-    // PDF options
-    var opt = {
-        margin: margin,
-        filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'in', format: [pageWidth, pageHeight], orientation: 'landscape' }
-    };
-
-    // Generate PDF
-    html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(function(pdf) {
-        // Remove temp wrapper
-        document.body.removeChild(wrapper);
-        // Restore button
-        btn.textContent = originalText;
-        btn.disabled = false;
-        // Open PDF in new tab for printing
-        window.open(pdf.output('bloburl'), '_blank');
-    }).catch(function(err) {
-        document.body.removeChild(wrapper);
-        btn.textContent = originalText;
-        btn.disabled = false;
-        alert('PDF generation failed: ' + err.message);
-    });
+    // Clean up after printing
+    setTimeout(function() {
+        document.getElementById('yearview').classList.remove('print-this');
+        document.body.classList.remove('print-letter', 'print-legal');
+        // Reset row heights
+        if (table) {
+            var rows = table.getElementsByTagName('tr');
+            for (var i = 0; i < rows.length; i++) {
+                rows[i].style.height = '';
+            }
+        }
+    }, 2000);
 }
 
 function downloadAsHTML() {
