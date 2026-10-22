@@ -3396,6 +3396,23 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .line-dropdown-option .pattern-day.work { background: #FFC000; color: #000; }
 .line-dropdown-clear { padding: 8px 10px; color: #888; cursor: pointer; border-bottom: 1px solid #333; }
 .line-dropdown-clear:hover { background: #2d4a6f; color: #fff; }
+
+/* Subtle/Print-friendly color scheme */
+body.subtle-colors .work, body.subtle-colors .schedule-table .work, body.subtle-colors .pattern-table .work { background: #B8E0E0 !important; }
+body.subtle-colors .off, body.subtle-colors .schedule-table .off, body.subtle-colors .pattern-table .off { background: #C8E8C8 !important; }
+body.subtle-colors .shift-cell.vac, body.subtle-colors .drag-item.vac { background: #F0C8D8 !important; }
+body.subtle-colors .shift-cell.hol, body.subtle-colors .drag-item.hol { background: #F5E8C0 !important; }
+body.subtle-colors .shift-cell.ppt, body.subtle-colors .drag-item.ppt { background: #D8D0E8 !important; color: #333 !important; }
+body.subtle-colors .shift-cell.special, body.subtle-colors .drag-item.special { background: #F5D0C0 !important; color: #333 !important; }
+body.subtle-colors .shift-cell.training, body.subtle-colors .drag-item.training { background: #E0E0B0 !important; color: #333 !important; }
+body.subtle-colors .shift-cell.swap, body.subtle-colors .drag-item.swap { background: #D0E8F0 !important; }
+body.subtle-colors .shift-cell.swapoff, body.subtle-colors .drag-item.swapoff { background: #E8F0D0 !important; }
+body.subtle-colors .shift-cell.compoff, body.subtle-colors .drag-item.compoff { background: #F0E8D8 !important; }
+body.subtle-colors .shift-cell.compwork, body.subtle-colors .drag-item.compwork { background: #E0D8F0 !important; }
+body.subtle-colors .shift-cell.ot { background: #F8E8B0 !important; }
+body.subtle-colors .shift-cell.dt { background: #F0D8D8 !important; }
+body.subtle-colors .line-dropdown-option .pattern-day.off { background: #C8E8C8 !important; }
+body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0 !important; }
 </style>
 </head>
 <body>
@@ -3505,6 +3522,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 <div id="yearview" class="tab-content active">
     <div class="tab-header no-print">
         <button onclick="printYearOverview()">Print Year Overview</button>
+        <button id="colorToggleBtn" onclick="toggleColorScheme()" style="margin-left:15px; background:#666;">🎨 Subtle Colors</button>
     </div>
     <div class="instructions no-print">
         <b>Edit cells:</b> Click any cell to type, or drag from palettes. Shifts prompt for Regular/SWAP/OT/DT.
@@ -3765,6 +3783,20 @@ function printTab(tabId) {
         document.getElementById(tabId).classList.remove('print-this');
         document.body.classList.remove('print-summary');
     }, 500);
+}
+
+function toggleColorScheme() {
+    var body = document.body;
+    var btn = document.getElementById('colorToggleBtn');
+    if (body.classList.contains('subtle-colors')) {
+        body.classList.remove('subtle-colors');
+        btn.textContent = '🎨 Subtle Colors';
+        btn.style.background = '#666';
+    } else {
+        body.classList.add('subtle-colors');
+        btn.textContent = '🎨 Vibrant Colors';
+        btn.style.background = '#28a745';
+    }
 }
 
 function printYearOverview() {
