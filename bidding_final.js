@@ -3256,6 +3256,7 @@ function isLineConfirmed(lineNbr) {
 <head>
 <meta charset="UTF-8">
 <title>Line ${displayNum} - ${bidYear}/${bidYear + 1}</title>
+<script src="https://flint-river.github.io/SOM-BID/app/html2pdf.bundle.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; background: #fff; }
@@ -3773,34 +3774,95 @@ function printTab(tabId) {
 function printYearOverview() {
     var paperSize = document.getElementById('paperSize').value;
 
-    // Set row heights before printing
-    var table = document.querySelector('.pattern-table');
-    if (table) {
-        var rows = table.getElementsByTagName('tr');
-        var rowHeight = (paperSize === 'legal') ? '38px' : '34px';
-        for (var i = 0; i < rows.length; i++) {
-            rows[i].style.height = rowHeight;
+    // Check if html2pdf is available
+    if (typeof html2pdf === 'undefined') {
+        // Fallback to standard print
+        var table = document.querySelector('.pattern-table');
+        if (table) {
+            var rows = table.getElementsByTagName('tr');
+            var rowHeight = (paperSize === 'legal') ? '38px' : '34px';
+            for (var i = 0; i < rows.length; i++) {
+                rows[i].style.height = rowHeight;
+            }
+        }
+        document.body.classList.add('print-' + paperSize);
+        document.getElementById('yearview').classList.add('print-this');
+        window.print();
+        setTimeout(function() {
+            document.getElementById('yearview').classList.remove('print-this');
+            document.body.classList.remove('print-letter', 'print-legal');
+            if (table) {
+                var rows = table.getElementsByTagName('tr');
+                for (var i = 0; i < rows.length; i++) { rows[i].style.height = ''; }
+            }
+        }, 1000);
+        return;
+    }
+
+    // PDF Generation
+    var title = document.querySelector('.title');
+    var titleText = title ? title.textContent : 'Year Overview';
+    var pageWidth = (paperSize === 'legal') ? 14 : 11;
+    var pageHeight = 8.5;
+    var margin = 0.2;
+
+    var yearview = document.getElementById('yearview');
+    var table = yearview.querySelector('.pattern-table');
+    if (!table) { alert('No table found'); return; }
+
+    var btn = document.querySelector('button[onclick="printYearOverview()"]');
+    if (btn) { btn.textContent = 'Generating PDF...'; btn.disabled = true; }
+
+    // Create PDF content
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'background:white; padding:10px;';
+
+    var titleEl = document.createElement('h3');
+    titleEl.textContent = titleText;
+    titleEl.style.cssText = 'text-align:center; margin:0 0 8px 0; font-size:16px; color:black;';
+    wrapper.appendChild(titleEl);
+
+    var tableClone = table.cloneNode(true);
+    tableClone.style.cssText = 'width:100%; border-collapse:collapse; table-layout:fixed;';
+
+    var usableHeight = pageHeight - (margin * 2) - 0.5;
+    var rowCount = tableClone.rows.length || 14;
+    var rowHeightPx = Math.floor((usableHeight * 72) / rowCount);
+
+    var rows = tableClone.getElementsByTagName('tr');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].style.height = rowHeightPx + 'px';
+        var cells = rows[i].querySelectorAll('td, th');
+        for (var j = 0; j < cells.length; j++) {
+            var cell = cells[j];
+            var origCell = table.rows[i] && table.rows[i].cells[j];
+            if (origCell) {
+                var computed = window.getComputedStyle(origCell);
+                cell.style.cssText = 'border:1px solid #333; text-align:center; vertical-align:middle; font-size:11px; padding:2px; background:' + computed.backgroundColor + '; color:' + computed.color + ';';
+            }
         }
     }
 
-    // Add print class
-    document.body.classList.remove('print-letter', 'print-legal');
-    document.body.classList.add('print-' + paperSize);
-    document.getElementById('yearview').classList.add('print-this');
+    wrapper.appendChild(tableClone);
+    document.body.appendChild(wrapper);
 
-    window.print();
+    var opt = {
+        margin: margin,
+        filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'in', format: [pageWidth, pageHeight], orientation: 'landscape' }
+    };
 
-    // Clean up after printing
-    setTimeout(function() {
-        document.getElementById('yearview').classList.remove('print-this');
-        document.body.classList.remove('print-letter', 'print-legal');
-        if (table) {
-            var rows = table.getElementsByTagName('tr');
-            for (var i = 0; i < rows.length; i++) {
-                rows[i].style.height = '';
-            }
-        }
-    }, 1000);
+    html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(function(pdf) {
+        document.body.removeChild(wrapper);
+        if (btn) { btn.textContent = 'Print Year Overview'; btn.disabled = false; }
+        window.open(pdf.output('bloburl'), '_blank');
+    }).catch(function(err) {
+        document.body.removeChild(wrapper);
+        if (btn) { btn.textContent = 'Print Year Overview'; btn.disabled = false; }
+        alert('PDF failed: ' + err.message + '. Try refreshing the page.');
+    });
 }
 
 function downloadAsHTML() {
