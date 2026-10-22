@@ -3866,6 +3866,14 @@ function printYearOverview() {
     html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(function(pdf) {
         document.body.removeChild(wrapper);
         if (btn) { btn.textContent = 'Print Year Overview'; btn.disabled = false; }
+
+        // Force correct page size for legal
+        if (paperSize === 'legal') {
+            var pages = pdf.internal.pages;
+            pdf.internal.pageSize.setWidth(14);
+            pdf.internal.pageSize.setHeight(8.5);
+        }
+
         window.open(pdf.output('bloburl'), '_blank');
     }).catch(function(err) {
         document.body.removeChild(wrapper);
