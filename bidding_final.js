@@ -1717,6 +1717,17 @@ function isLineConfirmed(lineNbr) {
         const ssomLines = ANNUAL_BID.filter(l => l.lineDesc === 'SSOM' || (l.lineNbr && String(l.lineNbr).includes('SSOM')));
         const somLines = ANNUAL_BID.filter(l => l.lineDesc === 'SOM' || (l.lineNbr && String(l.lineNbr).includes('SOM') && !String(l.lineNbr).includes('SSOM')));
 
+        // Count lines that have XXX or XX relief shifts
+        let xxxLines = 0;
+        let xxLines = 0;
+
+        ANNUAL_BID.forEach(line => {
+            const hasXXX = line.days.some(shift => shift === 'XXX');
+            const hasXX = line.days.some(shift => shift === 'XX');
+            if (hasXXX) xxxLines++;
+            if (hasXX) xxLines++;
+        });
+
         // Count by start time (extract from shift codes)
         const startTimeCounts = {};
         let multipleStartTimeLines = 0;
@@ -1762,6 +1773,10 @@ function isLineConfirmed(lineNbr) {
                         <div><span style="color:#4ecca3; font-weight:bold;">SSOM:</span> <span style="color:#fff;">${ssomLines.length}</span></div>
                         <div><span style="color:#4ecca3; font-weight:bold;">SOM:</span> <span style="color:#fff;">${somLines.length}</span></div>
                         <div><span style="color:#888;">Total:</span> <span style="color:#fff;">${ANNUAL_BID.length}</span></div>
+                    </div>
+                    <div style="display:flex; gap:20px; font-size:12px; margin-top:8px; padding-top:8px; border-top:1px solid #333;">
+                        <div><span style="color:#f39c12; font-weight:bold;">XXX Lines:</span> <span style="color:#fff;">${xxxLines}</span></div>
+                        <div><span style="color:#f39c12; font-weight:bold;">XX Lines:</span> <span style="color:#fff;">${xxLines}</span></div>
                     </div>
                 </div>
 
