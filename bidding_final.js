@@ -3860,7 +3860,7 @@ function printYearOverview() {
         filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'in', format: [pageHeight, pageWidth], orientation: 'landscape' }
+        jsPDF: { unit: 'in', format: (paperSize === 'legal') ? [14, 8.5] : [11, 8.5] }
     };
 
     html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(function(pdf) {
