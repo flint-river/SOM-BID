@@ -3813,21 +3813,26 @@ function printYearOverview() {
     var btn = document.querySelector('button[onclick="printYearOverview()"]');
     if (btn) { btn.textContent = 'Generating PDF...'; btn.disabled = true; }
 
-    // Create PDF content
+    // Create PDF content - calculate dimensions to fill the page
+    // Use 96 DPI base, content will be scaled to fit page
+    var contentWidth = (pageWidth - margin * 2) * 96;  // usable width in pixels at 96 DPI
+    var contentHeight = (pageHeight - margin * 2) * 96;  // usable height in pixels at 96 DPI
+    var titleHeight = 30;  // reserve for title
+    var tableHeight = contentHeight - titleHeight;
+
     var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'background:white; padding:10px;';
+    wrapper.style.cssText = 'background:white; width:' + contentWidth + 'px; height:' + contentHeight + 'px; padding:0; box-sizing:border-box;';
 
     var titleEl = document.createElement('h3');
     titleEl.textContent = titleText;
-    titleEl.style.cssText = 'text-align:center; margin:0 0 8px 0; font-size:16px; color:black;';
+    titleEl.style.cssText = 'text-align:center; margin:0; padding:5px 0; font-size:18px; color:black; height:' + titleHeight + 'px; box-sizing:border-box;';
     wrapper.appendChild(titleEl);
 
     var tableClone = table.cloneNode(true);
-    tableClone.style.cssText = 'width:100%; border-collapse:collapse; table-layout:fixed;';
+    var rowCount = tableClone.rows.length || 25;
+    var rowHeightPx = Math.floor(tableHeight / rowCount);
 
-    var usableHeight = pageHeight - (margin * 2) - 0.5;
-    var rowCount = tableClone.rows.length || 14;
-    var rowHeightPx = Math.floor((usableHeight * 72) / rowCount);
+    tableClone.style.cssText = 'width:100%; height:' + tableHeight + 'px; border-collapse:collapse; table-layout:fixed;';
 
     var rows = tableClone.getElementsByTagName('tr');
     for (var i = 0; i < rows.length; i++) {
@@ -3838,7 +3843,7 @@ function printYearOverview() {
             var origCell = table.rows[i] && table.rows[i].cells[j];
             if (origCell) {
                 var computed = window.getComputedStyle(origCell);
-                cell.style.cssText = 'border:1px solid #333; text-align:center; vertical-align:middle; font-size:11px; padding:2px; background:' + computed.backgroundColor + '; color:' + computed.color + ';';
+                cell.style.cssText = 'border:1px solid #333; text-align:center; vertical-align:middle; font-size:11px; padding:1px; height:' + rowHeightPx + 'px; background:' + computed.backgroundColor + '; color:' + computed.color + ';';
             }
         }
     }
@@ -3847,10 +3852,10 @@ function printYearOverview() {
     document.body.appendChild(wrapper);
 
     var opt = {
-        margin: margin,
+        margin: [margin, margin, margin, margin],
         filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        html2canvas: { scale: 1, useCORS: true, backgroundColor: '#ffffff', width: contentWidth, height: contentHeight },
         jsPDF: { unit: 'in', format: [pageWidth, pageHeight], orientation: 'landscape' }
     };
 
