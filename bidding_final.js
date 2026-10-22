@@ -3829,7 +3829,8 @@ function printYearOverview() {
     var titleText = title ? title.textContent : 'Year Overview';
     var pageWidth = 11;
     var pageHeight = 8.5;
-    var margin = 0.15;
+    var marginV = 0.15;  // vertical (top/bottom)
+    var marginH = 0.25;  // horizontal (left/right)
 
     var yearview = document.getElementById('yearview');
     var table = yearview.querySelector('.year-table');
@@ -3841,8 +3842,8 @@ function printYearOverview() {
     // Create PDF content - calculate dimensions to fill the page
     // Use 96 DPI base, content will be scaled to fit page
     // Reduce slightly to ensure single page
-    var contentWidth = (pageWidth - margin * 2 - 0.2) * 96;  // usable width in pixels at 96 DPI
-    var contentHeight = (pageHeight - margin * 2 - 0.2) * 96;  // usable height in pixels at 96 DPI
+    var contentWidth = (pageWidth - marginH * 2 - 0.2) * 96;  // usable width in pixels at 96 DPI
+    var contentHeight = (pageHeight - marginV * 2 - 0.2) * 96;  // usable height in pixels at 96 DPI
     var titleHeight = 25;  // reserve for title
     var tableHeight = contentHeight - titleHeight;
 
@@ -3878,7 +3879,7 @@ function printYearOverview() {
     document.body.appendChild(wrapper);
 
     var opt = {
-        margin: [margin, margin, margin, margin],
+        margin: [0.15, 0.25, 0.15, 0.25],  // top, right, bottom, left - more on sides
         filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
