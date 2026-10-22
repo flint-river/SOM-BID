@@ -3808,13 +3808,14 @@ function printYearOverview() {
 
     // Create PDF content - calculate dimensions to fill the page
     // Use 96 DPI base, content will be scaled to fit page
-    var contentWidth = (pageWidth - margin * 2) * 96;  // usable width in pixels at 96 DPI
-    var contentHeight = (pageHeight - margin * 2) * 96;  // usable height in pixels at 96 DPI
-    var titleHeight = 30;  // reserve for title
+    // Reduce slightly to ensure single page
+    var contentWidth = (pageWidth - margin * 2 - 0.2) * 96;  // usable width in pixels at 96 DPI
+    var contentHeight = (pageHeight - margin * 2 - 0.2) * 96;  // usable height in pixels at 96 DPI
+    var titleHeight = 25;  // reserve for title
     var tableHeight = contentHeight - titleHeight;
 
     var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'background:white; width:' + contentWidth + 'px; height:' + contentHeight + 'px; padding:0; box-sizing:border-box;';
+    wrapper.style.cssText = 'background:white; width:' + contentWidth + 'px; height:' + contentHeight + 'px; padding:0; box-sizing:border-box; overflow:hidden;';
 
     var titleEl = document.createElement('h3');
     titleEl.textContent = titleText;
