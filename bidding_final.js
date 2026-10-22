@@ -3815,6 +3815,8 @@ function printYearOverview() {
     var btn = document.querySelector('button[onclick="printYearOverview()"]');
     if (btn) { btn.textContent = 'Generating PDF...'; btn.disabled = true; }
 
+    console.log('PDF Settings:', paperSize, 'Width:', pageWidth, 'Height:', pageHeight);
+
     // Create PDF content - calculate dimensions to fill the page
     // Use 96 DPI base, content will be scaled to fit page
     var contentWidth = (pageWidth - margin * 2) * 96;  // usable width in pixels at 96 DPI
@@ -3857,8 +3859,8 @@ function printYearOverview() {
         margin: [margin, margin, margin, margin],
         filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 1, useCORS: true, backgroundColor: '#ffffff', width: contentWidth, height: contentHeight },
-        jsPDF: { unit: 'in', format: [pageHeight, pageWidth], orientation: 'l' }
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'in', format: [pageHeight, pageWidth], orientation: 'landscape' }
     };
 
     html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(function(pdf) {
