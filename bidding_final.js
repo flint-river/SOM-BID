@@ -1698,6 +1698,120 @@ function isLineConfirmed(lineNbr) {
         document.getElementById('statAvailSOM').textContent = GROUP2.length - takenSOM;
     }
 
+    // Line Summary Functions
+    let lineSummaryExpanded = false;
+
+    function toggleLineSummary() {
+        lineSummaryExpanded = !lineSummaryExpanded;
+        const content = document.getElementById('lineSummaryContent');
+        const toggle = document.getElementById('lineSummaryToggle');
+
+        if (lineSummaryExpanded) {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+            populateLineSummary();
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
+        }
+    }
+
+    function populateLineSummary() {
+        if (!ANNUAL_BID || ANNUAL_BID.length === 0) return;
+
+        // Count SSOM vs SOM
+        const ssomLines = ANNUAL_BID.filter(l => l.lineDesc === 'SSOM' || (l.lineNbr && String(l.lineNbr).includes('SSOM')));
+        const somLines = ANNUAL_BID.filter(l => l.lineDesc === 'SOM' || (l.lineNbr && String(l.lineNbr).includes('SOM') && !String(l.lineNbr).includes('SSOM')));
+
+        // Count by start time (extract from shift codes)
+        const startTimeCounts = {};
+        let multipleStartTimeLines = 0;
+
+        ANNUAL_BID.forEach(line => {
+            const startTimes = new Set();
+
+            line.days.forEach(shift => {
+                if (shift && shift !== '--' && shift !== '-') {
+                    // Extract start time code (e.g., E05 from E05A, P12 from P12B)
+                    const match = shift.match(/^([EAMP]\d{2})/);
+                    if (match) {
+                        startTimes.add(match[1]);
+                    }
+                }
+            });
+
+            // Count each unique start time for this line
+            startTimes.forEach(st => {
+                startTimeCounts[st] = (startTimeCounts[st] || 0) + 1;
+            });
+
+            // Check if line has multiple different start times
+            if (startTimes.size > 1) {
+                multipleStartTimeLines++;
+            }
+        });
+
+        // Sort start times by time of day
+        const sortedStartTimes = Object.entries(startTimeCounts).sort((a, b) => {
+            const hourA = parseInt(a[0].substring(1));
+            const hourB = parseInt(b[0].substring(1));
+            return hourA - hourB;
+        });
+
+        // Build HTML
+        let html = `
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:15px;">
+                <!-- Line Type Summary -->
+                <div style="background:#0f3460; padding:12px; border-radius:8px; border:1px solid #4ecca3;">
+                    <h4 style="color:#e94560; margin:0 0 10px 0; font-size:12px;">📋 Line Types</h4>
+                    <div style="display:flex; gap:20px; font-size:13px;">
+                        <div><span style="color:#4ecca3; font-weight:bold;">SSOM:</span> <span style="color:#fff;">${ssomLines.length}</span></div>
+                        <div><span style="color:#4ecca3; font-weight:bold;">SOM:</span> <span style="color:#fff;">${somLines.length}</span></div>
+                        <div><span style="color:#888;">Total:</span> <span style="color:#fff;">${ANNUAL_BID.length}</span></div>
+                    </div>
+                </div>
+
+                <!-- Multiple Start Times -->
+                <div style="background:#0f3460; padding:12px; border-radius:8px; border:1px solid #9b59b6;">
+                    <h4 style="color:#9b59b6; margin:0 0 10px 0; font-size:12px;">🔀 Multiple Start Times</h4>
+                    <div style="font-size:13px;">
+                        <span style="color:#fff; font-weight:bold; font-size:18px;">${multipleStartTimeLines}</span>
+                        <span style="color:#888;"> lines have different start times on different days</span>
+                    </div>
+                </div>
+
+                <!-- Start Time Breakdown -->
+                <div style="background:#0f3460; padding:12px; border-radius:8px; border:1px solid #f39c12; grid-column: span 2;">
+                    <h4 style="color:#f39c12; margin:0 0 10px 0; font-size:12px;">⏰ Lines by Start Time</h4>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        `;
+
+        sortedStartTimes.forEach(([startTime, count]) => {
+            // Color code by time of day
+            let bgColor = '#2d3748';
+            const hour = parseInt(startTime.substring(1));
+            if (hour >= 5 && hour < 10) bgColor = '#2d4a2d'; // Early morning - green
+            else if (hour >= 10 && hour < 14) bgColor = '#4a4a2d'; // Mid-day - yellow
+            else if (hour >= 14 && hour < 18) bgColor = '#4a3a2d'; // Afternoon - orange
+            else bgColor = '#4a2d4a'; // Evening/night - purple
+
+            html += `
+                <div style="background:${bgColor}; padding:6px 12px; border-radius:4px; font-size:11px; min-width:70px; text-align:center;">
+                    <div style="color:#fff; font-weight:bold;">${startTime}</div>
+                    <div style="color:#888;">${count} line${count !== 1 ? 's' : ''}</div>
+                </div>
+            `;
+        });
+
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('lineSummaryContent').innerHTML = html;
+    }
+
     function showLegend() {
         document.getElementById('legendModal').classList.add('show');
     }
@@ -10147,6 +10261,14 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.filterMyLifeResults = filterMyLifeResults;
     window.exportMyLifeDates = exportMyLifeDates;
     window.importMyLifeDates = importMyLifeDates;
+
+    // Line Summary functions
+    window.toggleLineSummary = toggleLineSummary;
+    window.populateLineSummary = populateLineSummary;
+
+    // Holiday filter functions
+    window.toggleHolidayFilter = toggleHolidayFilter;
+    window.clearHolidayFilters = clearHolidayFilters;
 
     // Your Edit standalone functions
     window.openYourEditStandalone = openYourEditStandalone;

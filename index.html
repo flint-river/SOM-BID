@@ -104,6 +104,16 @@
         </div>
     </div>
 
+    <!-- Line Summary Section -->
+    <div id="lineSummarySection" style="background:#0f3460; border-bottom:1px solid #1a1a2e; padding:0;">
+        <div onclick="toggleLineSummary()" style="cursor:pointer; padding:8px 20px; display:flex; align-items:center; gap:10px;">
+            <span id="lineSummaryToggle" style="color:#4ecca3; font-size:12px;">▶</span>
+            <span style="color:#e94560; font-weight:bold; font-size:12px;">📊 Line Summary</span>
+            <span style="color:#888; font-size:10px;">(click to expand)</span>
+        </div>
+        <div id="lineSummaryContent" style="display:none; padding:10px 20px 15px 20px; background:#1a1a2e;"></div>
+    </div>
+
     <div class="main-wrapper">
         <div class="main-container" style="display:grid; grid-template-columns:220px 1fr; gap:10px; min-height:min-content;">
             <div class="panel">
