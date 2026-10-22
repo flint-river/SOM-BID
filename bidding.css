@@ -305,6 +305,9 @@
         .line-row.hidden-fav {
             display: none !important;
         }
+        .line-row.holiday-filtered {
+            display: none !important;
+        }
 
         /* PTO overlay styles */
         .pto-date-item {

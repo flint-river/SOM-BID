@@ -1774,14 +1774,16 @@ function isLineConfirmed(lineNbr) {
         const yearDisplay = (typeof BID_CONFIG !== 'undefined') ? BID_CONFIG.getDisplayTitle() : '2026-2027';
         let html = `
             <div style="background:#0f3460; border-radius:8px; padding:15px; margin-bottom:20px;">
-                <h4 style="color:#e94560; margin-bottom:12px; font-size:13px;">🎊 Holiday Abbreviations (${yearDisplay})</h4>
+                <h4 style="color:#e94560; margin-bottom:8px; font-size:13px;">🎊 Holiday Abbreviations (${yearDisplay})</h4>
+                <p style="color:#888; font-size:10px; margin:0 0 10px 0;">💡 Click holidays to filter - shows only lines with those holidays OFF</p>
+                <div id="holidayFilterStatus" style="display:none; background:#1a1a2e; padding:6px 10px; border-radius:4px; margin-bottom:10px; font-size:11px;"></div>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
         `;
 
         sortedHolidays.forEach(([abbrev, info]) => {
             const emoji = holidayEmojis[abbrev] || '🎉';
             html += `
-                <div style="display:flex; gap:8px; padding:5px 0; font-size:11px; border-bottom:1px solid rgba(233,69,96,0.2);">
+                <div class="holiday-filter-item" data-holiday="${abbrev}" onclick="toggleHolidayFilter('${abbrev}')" style="display:flex; gap:8px; padding:5px 8px; font-size:11px; border-bottom:1px solid rgba(233,69,96,0.2); cursor:pointer; border-radius:4px; transition:all 0.2s;">
                     <span style="font-size:16px;">${emoji}</span>
                     <span style="color:#4ecca3; font-weight:bold; min-width:55px;">${abbrev}</span>
                     <span style="color:#eee; flex:1;">${info.name}</span>
@@ -1861,6 +1863,113 @@ function isLineConfirmed(lineNbr) {
 
     function hideHolidaySummary() {
         document.getElementById('holidaySummaryModal').classList.remove('show');
+        // Clear holiday filters when closing modal
+        selectedHolidayFilters = [];
+        applyHolidayFilter();
+    }
+
+    // Holiday Filter Functions
+    let selectedHolidayFilters = [];
+
+    function toggleHolidayFilter(abbrev) {
+        const idx = selectedHolidayFilters.indexOf(abbrev);
+        if (idx === -1) {
+            selectedHolidayFilters.push(abbrev);
+        } else {
+            selectedHolidayFilters.splice(idx, 1);
+        }
+        updateHolidayFilterUI();
+        applyHolidayFilter();
+    }
+
+    function updateHolidayFilterUI() {
+        const items = document.querySelectorAll('.holiday-filter-item');
+        items.forEach(item => {
+            const abbrev = item.dataset.holiday;
+            if (selectedHolidayFilters.includes(abbrev)) {
+                item.style.background = '#2d5a4a';
+                item.style.border = '2px solid #4ecca3';
+            } else {
+                item.style.background = 'transparent';
+                item.style.border = '2px solid transparent';
+            }
+        });
+
+        // Update filter status display
+        const statusEl = document.getElementById('holidayFilterStatus');
+        if (statusEl) {
+            if (selectedHolidayFilters.length > 0) {
+                statusEl.innerHTML = '<span style="color:#4ecca3;">🔍 Filtering: </span><span style="color:#e94560;">' + selectedHolidayFilters.join(', ') + '</span> <button onclick="clearHolidayFilters()" style="margin-left:10px; padding:2px 8px; font-size:10px; background:#e94560; color:white; border:none; border-radius:3px; cursor:pointer;">Clear All</button>';
+                statusEl.style.display = 'block';
+            } else {
+                statusEl.style.display = 'none';
+            }
+        }
+    }
+
+    function clearHolidayFilters() {
+        selectedHolidayFilters = [];
+        updateHolidayFilterUI();
+        applyHolidayFilter();
+    }
+
+    function applyHolidayFilter() {
+        const HOLIDAY_PATTERN_MAP = getHolidayPatternMap();
+
+        // Filter the Quick Reference table in the modal
+        const tableRows = document.querySelectorAll('#holidaySummaryContent tbody tr');
+        tableRows.forEach(row => {
+            if (selectedHolidayFilters.length === 0) {
+                row.style.display = '';
+                return;
+            }
+
+            // Check if this line has ALL selected holidays off
+            const holidaysCell = row.querySelector('td:nth-child(3)');
+            if (!holidaysCell) return;
+
+            const lineHolidays = holidaysCell.textContent.split(',').map(h => h.trim());
+            const hasAllSelected = selectedHolidayFilters.every(h => lineHolidays.includes(h));
+            row.style.display = hasAllSelected ? '' : 'none';
+        });
+
+        // Also filter main page line rows
+        const lineRows = document.querySelectorAll('.line-row');
+        lineRows.forEach(row => {
+            if (selectedHolidayFilters.length === 0) {
+                row.classList.remove('holiday-filtered');
+                return;
+            }
+
+            // Get line number from this row
+            const lineNbrEl = row.querySelector('.line-nbr');
+            if (!lineNbrEl) return;
+            const lineNbr = lineNbrEl.textContent.trim();
+
+            // Find this line in ANNUAL_BID
+            const line = ANNUAL_BID.find(l => String(l.lineNbr) === lineNbr || String(l.lineNbr).padStart(3, '0') === lineNbr.padStart(3, '0'));
+            if (!line) return;
+
+            // Check if line has all selected holidays off
+            let hasAllSelected = true;
+            for (const abbrev of selectedHolidayFilters) {
+                const holidayInfo = HOLIDAY_PATTERN_MAP[abbrev];
+                if (holidayInfo) {
+                    const patternDayIndex = holidayInfo.day - 1;
+                    const dayValue = line.days[patternDayIndex];
+                    if (dayValue !== '--' && dayValue !== '-') {
+                        hasAllSelected = false;
+                        break;
+                    }
+                }
+            }
+
+            if (hasAllSelected) {
+                row.classList.remove('holiday-filtered');
+            } else {
+                row.classList.add('holiday-filtered');
+            }
+        });
     }
 
     // Swap Compare Functions
