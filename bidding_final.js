@@ -3504,10 +3504,6 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 <!-- YEAR OVERVIEW TAB -->
 <div id="yearview" class="tab-content active">
     <div class="tab-header no-print">
-        <select id="paperSize" style="padding:5px; margin-right:10px; font-size:12px;">
-            <option value="letter">8.5" x 11" (Letter)</option>
-            <option value="legal">8.5" x 14" (Legal)</option>
-        </select>
         <button onclick="printYearOverview()">Print Year Overview</button>
     </div>
     <div class="instructions no-print">
@@ -3772,25 +3768,22 @@ function printTab(tabId) {
 }
 
 function printYearOverview() {
-    var paperSize = document.getElementById('paperSize').value;
-
     // Check if html2pdf is available
     if (typeof html2pdf === 'undefined') {
         // Fallback to standard print
         var table = document.querySelector('.year-table');
         if (table) {
             var rows = table.getElementsByTagName('tr');
-            var rowHeight = (paperSize === 'legal') ? '38px' : '34px';
             for (var i = 0; i < rows.length; i++) {
-                rows[i].style.height = rowHeight;
+                rows[i].style.height = '34px';
             }
         }
-        document.body.classList.add('print-' + paperSize);
+        document.body.classList.add('print-letter');
         document.getElementById('yearview').classList.add('print-this');
         window.print();
         setTimeout(function() {
             document.getElementById('yearview').classList.remove('print-this');
-            document.body.classList.remove('print-letter', 'print-legal');
+            document.body.classList.remove('print-letter');
             if (table) {
                 var rows = table.getElementsByTagName('tr');
                 for (var i = 0; i < rows.length; i++) { rows[i].style.height = ''; }
@@ -3799,14 +3792,12 @@ function printYearOverview() {
         return;
     }
 
-    // PDF Generation
+    // PDF Generation - Letter landscape (11" x 8.5")
     var title = document.querySelector('.title');
     var titleText = title ? title.textContent : 'Year Overview';
-    // For landscape: width is the longer dimension, height is 8.5
-    var pageWidth = (paperSize === 'legal') ? 14 : 11;
+    var pageWidth = 11;
     var pageHeight = 8.5;
     var margin = 0.15;
-    var pdfFormat = (paperSize === 'legal') ? 'legal' : 'letter';
 
     var yearview = document.getElementById('yearview');
     var table = yearview.querySelector('.year-table');
@@ -3814,8 +3805,6 @@ function printYearOverview() {
 
     var btn = document.querySelector('button[onclick="printYearOverview()"]');
     if (btn) { btn.textContent = 'Generating PDF...'; btn.disabled = true; }
-
-    console.log('PDF Settings:', paperSize, 'Width:', pageWidth, 'Height:', pageHeight);
 
     // Create PDF content - calculate dimensions to fill the page
     // Use 96 DPI base, content will be scaled to fit page
@@ -3860,20 +3849,12 @@ function printYearOverview() {
         filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { orientation: 'landscape', unit: 'in', format: (paperSize === 'legal') ? 'legal' : 'letter' }
+        jsPDF: { orientation: 'landscape', unit: 'in', format: 'letter' }
     };
 
     html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(function(pdf) {
         document.body.removeChild(wrapper);
         if (btn) { btn.textContent = 'Print Year Overview'; btn.disabled = false; }
-
-        // Force correct page size for legal
-        if (paperSize === 'legal') {
-            var pages = pdf.internal.pages;
-            pdf.internal.pageSize.setWidth(14);
-            pdf.internal.pageSize.setHeight(8.5);
-        }
-
         window.open(pdf.output('bloburl'), '_blank');
     }).catch(function(err) {
         document.body.removeChild(wrapper);
