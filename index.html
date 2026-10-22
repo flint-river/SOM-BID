@@ -49,57 +49,46 @@
         </div>
     </div>
 
-    <!-- ROW 2: Action Buttons with Dropdowns -->
+    <!-- ROW 2: All Action Buttons Visible -->
     <div class="status-bar">
-        <div class="stats" style="gap:8px;">
-            <!-- PRIMARY ACTIONS (always visible) -->
+        <div class="stats" style="gap:6px;">
+            <!-- PERSONAL -->
             <button class="btn" onclick="showMyLifeModal()" style="background:linear-gradient(135deg,#ec4899,#db2777); color:white; font-weight:bold;">💝 My Life</button>
             <button class="btn" onclick="toggleFavoritesView()" id="favoritesBtn" style="background:#9d174d; color:white;">⭐ Favorites (<span id="favCount">0</span>)</button>
 
-            <span style="color:#333; margin:0 4px;">│</span>
+            <span style="color:#444; margin:0 2px;">│</span>
 
-            <!-- VIEWS DROPDOWN -->
-            <div class="header-dropdown" style="position:relative; display:inline-block;">
-                <button class="btn" onclick="toggleHeaderDropdown('viewsDropdown')" style="background:#047857; color:white;">📅 Views ▾</button>
-                <div id="viewsDropdown" class="header-dropdown-menu" style="display:none; position:absolute; top:100%; left:0; background:#1a1a2e; border:1px solid #4ecca3; border-radius:6px; min-width:150px; z-index:1000; margin-top:4px;">
-                    <a href="#" onclick="openYearTimeline(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">📅 Timeline</a>
-                    <a href="#" onclick="showHolidaySummary(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">🎄 Holidays</a>
-                    <a href="#" onclick="showLegend(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none;">📖 Legend</a>
-                </div>
-            </div>
+            <!-- VIEWS -->
+            <a href="#" onclick="openYearTimeline(); return false;" class="btn" style="background:#047857; color:white; text-decoration:none;">📅 Timeline</a>
+            <button class="btn" onclick="showHolidaySummary()" style="background:#065f46; color:white;">🎄 Holidays</button>
 
-            <!-- TOOLS DROPDOWN -->
-            <div class="header-dropdown" style="position:relative; display:inline-block;">
-                <button class="btn" onclick="toggleHeaderDropdown('toolsDropdown')" style="background:#6d28d9; color:white;">🛠️ Tools ▾</button>
-                <div id="toolsDropdown" class="header-dropdown-menu" style="display:none; position:absolute; top:100%; left:0; background:#1a1a2e; border:1px solid #8b5cf6; border-radius:6px; min-width:150px; z-index:1000; margin-top:4px;">
-                    <a href="#" onclick="showSwapCompare(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">🔄 Compare</a>
-                    <a href="#" onclick="openYourEditStandalone(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">✏️ Your Edit</a>
-                    <a href="#" onclick="toggleBidHistoryView(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none;">📜 History</a>
-                </div>
-            </div>
+            <span style="color:#444; margin:0 2px;">│</span>
 
-            <!-- ADMIN GROUP (hidden until admin mode) -->
-            <span id="adminDivider" style="display:none; color:#333; margin:0 4px;">│</span>
-            <div id="adminButtonGroup" class="header-dropdown" style="display:none; position:relative;">
-                <button class="btn" onclick="toggleHeaderDropdown('adminDropdown')" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#1a1a2e; font-weight:bold;">⚙️ Admin ▾</button>
-                <div id="adminDropdown" class="header-dropdown-menu" style="display:none; position:absolute; top:100%; left:0; background:#1a1a2e; border:1px solid #f59e0b; border-radius:6px; min-width:160px; z-index:1000; margin-top:4px;">
-                    <a href="#" onclick="toggleLiveMode(); closeHeaderDropdowns(); return false;" id="liveModeLink" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">🔴 Live Mode</a>
-                    <a href="#" onclick="showEscalationManager(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">⚡ Escalate</a>
-                    <a href="#" onclick="triggerPatternUpload(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">📁 Patterns</a>
-                    <a href="seniority_compiler.html" target="_blank" onclick="closeHeaderDropdowns();" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">📋 Seniority</a>
-                    <a href="#" onclick="showArchiveViewer(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">📁 Archive</a>
-                    <a href="#" onclick="showColorManager(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none; border-bottom:1px solid #333;">🎨 Colors</a>
-                    <a href="#" onclick="showNextYearSetup(); closeHeaderDropdowns(); return false;" style="display:block; padding:10px 15px; color:#fff; text-decoration:none;">⚙️ Next Year</a>
-                </div>
-                <input type="file" id="patternFileInput" accept=".json" style="display:none;" onchange="handlePatternUpload(event)">
-            </div>
+            <!-- TOOLS -->
+            <button class="btn" onclick="showSwapCompare()" style="background:#7c3aed; color:white;">🔄 Compare</button>
+            <button class="btn" onclick="openYourEditStandalone()" style="background:#6d28d9; color:white;">✏️ Your Edit</button>
+            <button class="btn" onclick="toggleBidHistoryView()" id="bidHistoryBtn" style="background:#475569; color:white;">📜 History</button>
+            <button class="btn" onclick="showLegend()" style="background:#334155; color:#ccc;">Legend</button>
+        </div>
+    </div>
 
-            <!-- UNDO GROUP (separate, shown when available) -->
-            <div class="undo-rollback-container" id="undoRollbackContainer" style="display:none; position:relative; margin-left:4px;">
-                <button class="btn" onclick="toggleUndoRollbackDropdown()" id="undoRollbackBtn" style="background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#1a1a2e;">↩️ Undo ▾</button>
+    <!-- ROW 3: Admin Buttons (hidden until admin mode) -->
+    <div id="adminButtonRow" style="display:none; background:#1a1a2e; padding:6px 20px; border-bottom:1px solid #f59e0b;">
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <span style="color:#f59e0b; font-weight:bold; font-size:11px; margin-right:8px;">⚙️ ADMIN:</span>
+            <button class="btn" onclick="toggleLiveMode()" id="liveModeBtn" style="background:#16213e; color:#4ecca3; border:1px solid #4ecca3; font-size:11px; padding:4px 10px;">🔴 Live</button>
+            <button class="btn" onclick="showEscalationManager()" id="escalationBtn" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#1a1a2e; font-size:11px; padding:4px 10px;">⚡ Escalate</button>
+            <button class="btn" onclick="triggerPatternUpload()" id="uploadPatternsBtn" style="background:#059669; color:white; font-size:11px; padding:4px 10px;">📁 Patterns</button>
+            <input type="file" id="patternFileInput" accept=".json" style="display:none;" onchange="handlePatternUpload(event)">
+            <button class="btn" onclick="window.open('seniority_compiler.html', '_blank')" id="seniorityCompilerBtn" style="background:#0d9488; color:white; font-size:11px; padding:4px 10px;">📋 Seniority</button>
+            <button class="btn" onclick="showArchiveViewer()" id="archiveBtn" style="background:#7c3aed; color:white; font-size:11px; padding:4px 10px;">📁 Archive</button>
+            <button class="btn" onclick="showColorManager()" id="colorManagerBtn" style="background:#dc2626; color:white; font-size:11px; padding:4px 10px;">🎨 Colors</button>
+            <button class="btn" onclick="showNextYearSetup()" id="nextYearSetupBtn" style="background:#7c3aed; color:white; font-size:11px; padding:4px 10px;">⚙️ Next Year</button>
+            <!-- UNDO GROUP -->
+            <div class="undo-rollback-container" id="undoRollbackContainer" style="display:none; position:relative; margin-left:8px;">
+                <button class="btn" onclick="toggleUndoRollbackDropdown()" id="undoRollbackBtn" style="background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#1a1a2e; font-size:11px; padding:4px 10px;">↩️ Undo ▾</button>
                 <div class="undo-rollback-dropdown" id="undoRollbackDropdown"></div>
             </div>
-
         </div>
     </div>
 

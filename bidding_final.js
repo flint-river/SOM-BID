@@ -698,12 +698,9 @@
             document.getElementById('undoRollbackContainer').style.display = 'inline-block';
             updateUndoRollbackDropdown();
         }
-        // Show admin button group
-        if (document.getElementById('adminButtonGroup')) {
-            document.getElementById('adminButtonGroup').style.display = 'inline-flex';
-        }
-        if (document.getElementById('adminDivider')) {
-            document.getElementById('adminDivider').style.display = 'inline';
+        // Show admin button row
+        if (document.getElementById('adminButtonRow')) {
+            document.getElementById('adminButtonRow').style.display = 'block';
         }
 
         // Initialize admin year selector for universal bid application
@@ -865,12 +862,9 @@
         if (document.getElementById('undoRollbackContainer')) {
             document.getElementById('undoRollbackContainer').style.display = 'none';
         }
-        // Hide admin button group
-        if (document.getElementById('adminButtonGroup')) {
-            document.getElementById('adminButtonGroup').style.display = 'none';
-        }
-        if (document.getElementById('adminDivider')) {
-            document.getElementById('adminDivider').style.display = 'none';
+        // Hide admin button row
+        if (document.getElementById('adminButtonRow')) {
+            document.getElementById('adminButtonRow').style.display = 'none';
         }
         // Turn off live mode if it was on
         if (liveMode) {
