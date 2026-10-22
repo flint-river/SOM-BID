@@ -3771,101 +3771,36 @@ function printTab(tabId) {
 }
 
 function printYearOverview() {
-    // Check if html2pdf is available
-    if (typeof html2pdf === 'undefined') {
-        alert('PDF library not loaded. Using standard print instead.');
-        window.print();
-        return;
-    }
-
     var paperSize = document.getElementById('paperSize').value;
-    var title = document.querySelector('.title');
-    var titleText = title ? title.textContent : 'Year Overview';
 
-    // Page dimensions in inches (landscape)
-    var pageWidth = (paperSize === 'legal') ? 14 : 11;
-    var pageHeight = 8.5;
-    var margin = 0.2;
-
-    // Get the table
-    var yearview = document.getElementById('yearview');
-    var table = yearview.querySelector('.pattern-table');
-    if (!table) {
-        alert('No table found to print');
-        return;
+    // Set row heights before printing
+    var table = document.querySelector('.pattern-table');
+    if (table) {
+        var rows = table.getElementsByTagName('tr');
+        var rowHeight = (paperSize === 'legal') ? '38px' : '34px';
+        for (var i = 0; i < rows.length; i++) {
+            rows[i].style.height = rowHeight;
+        }
     }
 
-    // Show loading state
-    var btn = document.querySelector('button[onclick="printYearOverview()"]');
-    var originalText = btn ? btn.textContent : '';
-    if (btn) {
-        btn.textContent = 'Generating PDF...';
-        btn.disabled = true;
-    }
+    // Add print class
+    document.body.classList.remove('print-letter', 'print-legal');
+    document.body.classList.add('print-' + paperSize);
+    document.getElementById('yearview').classList.add('print-this');
 
-    // Create wrapper for PDF
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'background:white; padding:10px; box-sizing:border-box; width:' + (pageWidth - margin*2) + 'in;';
+    window.print();
 
-    // Add title
-    var titleEl = document.createElement('h3');
-    titleEl.textContent = titleText;
-    titleEl.style.cssText = 'text-align:center; margin:0 0 8px 0; font-size:16px; color:black;';
-    wrapper.appendChild(titleEl);
-
-    // Clone the table
-    var tableClone = table.cloneNode(true);
-    tableClone.style.cssText = 'width:100%; border-collapse:collapse; table-layout:fixed;';
-
-    // Calculate row height to fill page
-    var usableHeight = pageHeight - (margin * 2) - 0.5;
-    var rowCount = tableClone.rows.length || 14;
-    var rowHeightPx = Math.floor((usableHeight * 72) / rowCount);
-
-    // Style all rows and cells for PDF
-    var rows = tableClone.getElementsByTagName('tr');
-    for (var i = 0; i < rows.length; i++) {
-        rows[i].style.height = rowHeightPx + 'px';
-        var cells = rows[i].querySelectorAll('td, th');
-        for (var j = 0; j < cells.length; j++) {
-            var cell = cells[j];
-            var origCell = table.rows[i] && table.rows[i].cells[j];
-            if (origCell) {
-                var computed = window.getComputedStyle(origCell);
-                cell.style.cssText = 'border:1px solid #333; text-align:center; vertical-align:middle; font-size:11px; padding:2px; background:' + computed.backgroundColor + '; color:' + computed.color + ';';
+    // Clean up after printing
+    setTimeout(function() {
+        document.getElementById('yearview').classList.remove('print-this');
+        document.body.classList.remove('print-letter', 'print-legal');
+        if (table) {
+            var rows = table.getElementsByTagName('tr');
+            for (var i = 0; i < rows.length; i++) {
+                rows[i].style.height = '';
             }
         }
-    }
-
-    wrapper.appendChild(tableClone);
-    document.body.appendChild(wrapper);
-
-    // PDF options
-    var opt = {
-        margin: margin,
-        filename: titleText.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'in', format: [pageWidth, pageHeight], orientation: 'landscape' }
-    };
-
-    // Generate PDF
-    html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(function(pdf) {
-        document.body.removeChild(wrapper);
-        if (btn) {
-            btn.textContent = originalText;
-            btn.disabled = false;
-        }
-        window.open(pdf.output('bloburl'), '_blank');
-    }).catch(function(err) {
-        document.body.removeChild(wrapper);
-        if (btn) {
-            btn.textContent = originalText;
-            btn.disabled = false;
-        }
-        console.error('PDF error:', err);
-        alert('PDF generation failed: ' + err.message);
-    });
+    }, 1000);
 }
 
 function downloadAsHTML() {
