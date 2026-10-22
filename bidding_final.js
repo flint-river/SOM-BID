@@ -3256,7 +3256,7 @@ function isLineConfirmed(lineNbr) {
 <head>
 <meta charset="UTF-8">
 <title>Line ${displayNum} - ${bidYear}/${bidYear + 1}</title>
-<script src="https://flint-river.github.io/SOM-BID/app/html2pdf.bundle.min.js"></script>
+<script src="https://flint-river.github.io/SOM-BID/html2pdf.bundle.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; background: #fff; }
