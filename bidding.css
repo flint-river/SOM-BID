@@ -1138,58 +1138,58 @@
                 width: 100% !important;
                 height: 100% !important;
                 background: white !important;
-                padding: 0.1in !important;
+                padding: 0.15in !important;
                 margin: 0 !important;
                 box-sizing: border-box !important;
-                display: flex !important;
-                flex-direction: column !important;
             }
             #yearview.print-this .no-print {
                 display: none !important;
             }
             #yearview.print-this h3,
             #yearview.print-this h4 {
-                font-size: 16px !important;
+                font-size: 14pt !important;
                 margin: 0 0 0.1in 0 !important;
                 text-align: center !important;
-                flex-shrink: 0 !important;
+                color: black !important;
             }
             #yearview.print-this .pattern-table {
                 width: 100% !important;
-                flex: 1 !important;
+                height: calc(100vh - 0.6in) !important;
                 table-layout: fixed !important;
                 border-collapse: collapse !important;
             }
             #yearview.print-this .pattern-table td {
-                padding: 0 !important;
+                padding: 2px 1px !important;
                 border: 1px solid #333 !important;
-                font-size: 9px !important;
+                font-size: 10px !important;
                 text-align: center !important;
                 vertical-align: middle !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                color-adjust: exact !important;
             }
             #yearview.print-this .pattern-table tr {
-                height: calc(100% / 14) !important;
+                height: calc((100vh - 0.8in) / 14) !important;
             }
             #yearview.print-this .pattern-table .header {
-                font-size: 8px !important;
+                font-size: 9px !important;
                 font-weight: bold !important;
                 background: #87CEEB !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
             #yearview.print-this .traditional-view {
                 width: 100% !important;
-                height: 100% !important;
-                display: flex !important;
-                flex-direction: column !important;
+                height: calc(100vh - 0.6in) !important;
             }
             #yearview.print-this .traditional-month {
-                flex: 1 !important;
-                min-height: 0 !important;
+                height: calc((100vh - 0.8in) / 12) !important;
             }
             #yearview.print-this .traditional-day-cell {
-                font-size: 8px !important;
-                padding: 1px !important;
+                font-size: 9px !important;
+                padding: 2px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
         }
 
