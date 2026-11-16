@@ -148,6 +148,21 @@
         </div>
 
         <div class="container">
+            <!-- Draft Status Banner -->
+            <div id="draftBanner" class="hidden" style="background: linear-gradient(135deg, #f39c12, #e67e22); padding: 12px 20px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">📝</span>
+                    <div>
+                        <div style="font-weight: bold; color: #1a1a2e;">Working on DRAFT</div>
+                        <div style="font-size: 12px; color: #1a1a2e; opacity: 0.8;" id="draftSavedTime">Not yet saved to Firebase</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn" onclick="saveDraftToFirebase()" style="background: #1a1a2e; color: #f39c12; border: 2px solid #1a1a2e;">💾 Save Draft</button>
+                    <span style="color: #1a1a2e; font-size: 12px;">Draft is private until you Publish</span>
+                </div>
+            </div>
+
             <a href="index.html" class="back-link">← Back to Polish Bid App</a>
 
             <div class="workflow-status">
@@ -169,15 +184,20 @@
 
             <div class="step-section" id="loadSection">
                 <h2>Step 1: Load Previous Work (Optional)</h2>
-                <p style="color:#888; margin-bottom:15px;">If you have a saved JSON file from before, load it first to preserve your title changes.</p>
+                <p style="color:#888; margin-bottom:15px;">Load your in-progress draft from Firebase, or a saved JSON file from your computer.</p>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <button class="btn btn-orange" onclick="loadDraftFromFirebase()" style="font-size: 14px;">
+                        ☁️ Load Draft from Firebase
+                    </button>
+                    <span style="color:#666;">or</span>
                     <label class="btn btn-purple" style="cursor:pointer;">
-                        📂 Load Previous Work (.json)
+                        📂 Load from File (.json)
                         <input type="file" id="loadFileInput" accept=".json" onchange="loadWorkFromFile(event)" style="display:none;">
                     </label>
                     <span style="color:#666;">or</span>
                     <button class="btn btn-secondary" onclick="skipLoadStep()">Skip - Start Fresh</button>
                 </div>
+                <div id="draftLoadStatus" style="margin-top: 10px;"></div>
                 <div id="loadedInfo" class="loaded-info hidden"></div>
             </div>
 
@@ -268,17 +288,24 @@
                     <div class="preview-box som"><h3 class="som-title">GROUP2 - SOM (<span id="previewSOMCount">0</span>)</h3><div class="preview-list" id="previewSOM"></div></div>
                 </div>
                 
+                <!-- Save Draft Section -->
+                <div style="background:#0f3460; padding:20px; border-radius:8px; margin-bottom:20px; border-left:4px solid #f39c12;">
+                    <h3 style="color:#f39c12; margin-bottom:10px;">💾 Save Draft (Private)</h3>
+                    <p style="color:#888; font-size:13px; margin-bottom:15px;">Save your work-in-progress to Firebase. Only you can see it - users won't see any changes until you Publish.</p>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        <button class="btn" onclick="saveDraftToFirebase()" style="background:#f39c12; color:#1a1a2e; font-size:16px; padding:15px 30px;">💾 Save Draft to Firebase</button>
+                        <button class="btn btn-secondary" onclick="saveWorkToFile()">📁 Also Save to File (.json)</button>
+                    </div>
+                    <div id="draftSaveStatus" style="margin-top:10px;"></div>
+                </div>
+
+                <!-- Publish Section -->
                 <div style="background:#0f3460; padding:20px; border-radius:8px; margin-bottom:20px; border-left:4px solid #e74c3c;">
                     <h3 style="color:#e74c3c; margin-bottom:10px;">🚀 Publish to Live App</h3>
-                    <p style="color:#888; font-size:13px; margin-bottom:15px;">This updates the seniority list in the live bid app immediately. All pages will use the new list.</p>
-                    <button class="btn" onclick="publishToFirebase()" style="background:#e74c3c; color:white; font-size:16px; padding:15px 30px;">🚀 Publish to Firebase (Live)</button>
+                    <p style="color:#888; font-size:13px; margin-bottom:15px;"><strong style="color:#e74c3c;">⚠️ This makes changes LIVE immediately.</strong> All users will see the new seniority list. Only publish when you're ready!</p>
+                    <button class="btn" onclick="publishToFirebase()" style="background:#e74c3c; color:white; font-size:16px; padding:15px 30px;">🚀 Publish to Live App</button>
                     <div id="publishStatus" style="margin-top:10px;"></div>
                 </div>
-                
-                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
-                    <button class="btn" onclick="saveWorkToFile()" style="background:#2ecc71; color:white; font-size:16px; padding:15px 30px;">💾 Save Work for Later (.json)</button>
-                </div>
-                <p style="color:#888; font-size:12px; margin-bottom:20px;">Save this JSON file to your computer (NOT GitHub). Load it next time to preserve your changes.</p>
                 <hr style="border-color:#333; margin:20px 0;">
                 <p style="color:#666; font-size:12px; margin-bottom:10px;">Manual export (no longer needed if you use Publish to Firebase):</p>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -300,6 +327,8 @@
 
         let seniorityData = [], previousData = [], currentFilter = 'all', searchTerm = '', hasPreviousData = false;
         let changestoReview = []; // Track PAFCA changes that need review
+        let isDraft = false; // Track if we're working on a draft
+        let draftLastSaved = null; // Track when draft was last saved
 
         // Helper function to get Firebase URLs based on current bid year
         function getFirebaseUrl() {
@@ -308,6 +337,12 @@
 
         function getSeniorityPath() {
             return BidYearIntegration.getSeniorityPath();
+        }
+
+        function getSeniorityDraftPath() {
+            // Draft path is separate from published seniority
+            const basePath = getSeniorityPath();
+            return basePath.replace('/seniority.json', '/seniority_draft.json');
         }
 
         function getBidDataPath() {
@@ -352,6 +387,7 @@
             document.getElementById('passwordModal').classList.remove('show');
             document.getElementById('mainContent').classList.remove('hidden');
             initBidYearSelector();
+            checkForExistingDraft();
         }
 
         async function checkPassword() {
@@ -364,6 +400,7 @@
                 document.getElementById('passwordModal').classList.remove('show');
                 document.getElementById('mainContent').classList.remove('hidden');
                 initBidYearSelector();
+                checkForExistingDraft();
             } catch (e) { errorDiv.textContent = 'Incorrect password'; errorDiv.style.color = '#e94560'; }
         }
 
@@ -519,6 +556,9 @@
             document.getElementById('step4').classList.remove('hidden');
             updateWorkflowStatus(4);
             renderTable(); updatePreview();
+
+            // Show draft banner since we now have data to work with
+            showDraftBanner();
             
             if (hasPreviousData) {
                 let msg = `Merge complete!\n\n✅ Matched: ${matchedCount} (no changes)`;
@@ -736,6 +776,139 @@
             return { ssomList, somList };
         }
 
+        // ==================== DRAFT FUNCTIONS ====================
+
+        function showDraftBanner() {
+            isDraft = true;
+            document.getElementById('draftBanner').classList.remove('hidden');
+            document.getElementById('draftBanner').style.display = 'flex';
+        }
+
+        function updateDraftSavedTime(timestamp) {
+            draftLastSaved = timestamp;
+            const timeStr = new Date(timestamp).toLocaleString();
+            document.getElementById('draftSavedTime').textContent = `Last saved: ${timeStr}`;
+        }
+
+        async function saveDraftToFirebase() {
+            if (seniorityData.length === 0) {
+                alert('No data to save as draft.');
+                return;
+            }
+
+            const statusDiv = document.getElementById('draftSaveStatus');
+            statusDiv.innerHTML = '<span style="color:#f39c12;">Saving draft...</span>';
+
+            try {
+                const baseUrl = getFirebaseUrl();
+                const draftPath = getSeniorityDraftPath();
+
+                // Save the full seniorityData array (not just compiled lists) so we can continue editing
+                const draftData = {
+                    version: '1.0',
+                    savedAt: new Date().toISOString(),
+                    savedBy: 'SeniorityCompiler',
+                    totalRecords: seniorityData.length,
+                    ssomCount: seniorityData.filter(p => p.title === 'SSOM').length,
+                    somCount: seniorityData.filter(p => p.title === 'SOM' || p.title === 'SOM-QA').length,
+                    data: seniorityData
+                };
+
+                console.log(`[SeniorityCompiler] Saving draft to: ${draftPath}`);
+                const response = await fetch(`${baseUrl}${draftPath}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(draftData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to save draft: ${response.status}`);
+                }
+
+                updateDraftSavedTime(draftData.savedAt);
+                showDraftBanner();
+                statusDiv.innerHTML = '<span style="color:#2ecc71;">✅ Draft saved to Firebase! Users won\'t see these changes until you Publish.</span>';
+
+                console.log(`[SeniorityCompiler] Draft saved successfully`);
+            } catch (err) {
+                console.error('Failed to save draft:', err);
+                statusDiv.innerHTML = `<span style="color:#e74c3c;">❌ Error saving draft: ${err.message}</span>`;
+            }
+        }
+
+        async function loadDraftFromFirebase() {
+            const statusDiv = document.getElementById('draftLoadStatus');
+            statusDiv.innerHTML = '<span style="color:#f39c12;">Loading draft from Firebase...</span>';
+
+            try {
+                const baseUrl = getFirebaseUrl();
+                const draftPath = getSeniorityDraftPath();
+
+                console.log(`[SeniorityCompiler] Loading draft from: ${draftPath}`);
+                const response = await fetch(`${baseUrl}${draftPath}`);
+
+                if (!response.ok) {
+                    statusDiv.innerHTML = '<span style="color:#888;">No draft found. Start fresh or load a JSON file.</span>';
+                    return;
+                }
+
+                const draftData = await response.json();
+
+                if (!draftData || !draftData.data || draftData.data.length === 0) {
+                    statusDiv.innerHTML = '<span style="color:#888;">No draft found or draft is empty.</span>';
+                    return;
+                }
+
+                // Load the draft data
+                previousData = draftData.data.map(p => ({...p}));
+                hasPreviousData = true;
+
+                statusDiv.innerHTML = `<span style="color:#2ecc71;">✅ Draft loaded! ${draftData.data.length} records (saved ${new Date(draftData.savedAt).toLocaleString()})</span>`;
+                document.getElementById('loadedInfo').classList.remove('hidden');
+                document.getElementById('loadedInfo').innerHTML = `
+                    <strong>📝 Draft Loaded from Firebase</strong><br>
+                    ${draftData.totalRecords} total records |
+                    SSOM: ${draftData.ssomCount} |
+                    SOM: ${draftData.somCount}<br>
+                    <span style="font-size:12px;">Last saved: ${new Date(draftData.savedAt).toLocaleString()}</span>
+                `;
+
+                // Show the paste section
+                document.getElementById('pasteSection').classList.remove('hidden');
+                updateWorkflowStatus(2);
+
+                // Show draft banner
+                updateDraftSavedTime(draftData.savedAt);
+                showDraftBanner();
+
+                console.log(`[SeniorityCompiler] Draft loaded: ${draftData.data.length} records`);
+            } catch (err) {
+                console.error('Failed to load draft:', err);
+                statusDiv.innerHTML = `<span style="color:#e74c3c;">❌ Error loading draft: ${err.message}</span>`;
+            }
+        }
+
+        async function checkForExistingDraft() {
+            // Check if there's a draft when the page loads
+            try {
+                const baseUrl = getFirebaseUrl();
+                const draftPath = getSeniorityDraftPath();
+                const response = await fetch(`${baseUrl}${draftPath}`);
+
+                if (response.ok) {
+                    const draftData = await response.json();
+                    if (draftData && draftData.data && draftData.data.length > 0) {
+                        const statusDiv = document.getElementById('draftLoadStatus');
+                        statusDiv.innerHTML = `<span style="color:#f39c12;">📝 Draft found! ${draftData.data.length} records saved ${new Date(draftData.savedAt).toLocaleString()}. Click "Load Draft from Firebase" to continue.</span>`;
+                    }
+                }
+            } catch (err) {
+                // Silently ignore - no draft available
+            }
+        }
+
+        // ==================== END DRAFT FUNCTIONS ====================
+
         function downloadFile(content, filename, type) {
             const blob = new Blob([content], { type }); const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
@@ -905,6 +1078,18 @@
                     })
                 });
                 
+                // Clear the draft since we've published
+                try {
+                    const draftPath = getSeniorityDraftPath();
+                    await fetch(`${baseUrl}${draftPath}`, { method: 'DELETE' });
+                    console.log('[SeniorityCompiler] Draft cleared after publish');
+                    // Hide the draft banner
+                    document.getElementById('draftBanner').classList.add('hidden');
+                    isDraft = false;
+                } catch (draftErr) {
+                    console.warn('Could not clear draft:', draftErr);
+                }
+
                 const bidYear = BID_CONFIG.getBidYear();
                 statusDiv.innerHTML = `<span style="color:#2ecc71;">✅ Published successfully to ${bidYear}-${bidYear+1} Bid Year!</span><br>
                     <span style="font-size:12px; color:#888;">
@@ -912,9 +1097,10 @@
                     <strong>Seniority:</strong> SSOM: ${ssomList.length} | SOM: ${somList.length}<br>
                     <strong>Assignments migrated:</strong> ${migratedCount} lines followed their people<br>
                     <strong>Confirmations:</strong> ${Object.keys(newConfirmations).length} preserved<br>
+                    <strong>Draft:</strong> Cleared (now live)<br>
                     <br>
                     Refresh the bid app with <code>?bidYear=${bidYear}</code> to see the changes.</span>`;
-                
+
                 updateWorkflowStatus(5);
                 
             } catch (err) {
@@ -955,11 +1141,14 @@
             renderTable();
             renderPreview();
             updateWorkflowStatus(4);
+            // Show draft banner
+            showDraftBanner();
         }
 
         function clearAll() {
             if (seniorityData.length > 0 && !confirm('Start over? This will clear all data.')) return;
             seniorityData = []; previousData = []; hasPreviousData = false; changestoReview = [];
+            isDraft = false; draftLastSaved = null;
             document.getElementById('seniorityPasteBox').value = '';
             document.getElementById('loadedInfo').classList.add('hidden');
             document.getElementById('pasteSection').classList.add('hidden');
@@ -967,7 +1156,11 @@
             document.getElementById('changesSection').classList.add('hidden');
             document.getElementById('step3').classList.add('hidden');
             document.getElementById('step4').classList.add('hidden');
+            document.getElementById('draftBanner').classList.add('hidden');
+            document.getElementById('draftLoadStatus').innerHTML = '';
+            document.getElementById('draftSaveStatus').innerHTML = '';
             updateWorkflowStatus(1);
+            checkForExistingDraft(); // Check if there's still a draft in Firebase
         }
     </script>
 </body>
