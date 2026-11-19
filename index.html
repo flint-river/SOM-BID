@@ -194,6 +194,11 @@
                     <div class="legend-item"><span class="legend-code">J/K</span><span>Regional</span></div>
                 </div>
                 <div class="legend-section">
+                    <h4>Other SOM Desks</h4>
+                    <div class="legend-item"><span class="legend-code">ATL</span><span>SOM - ATL ACC office (staffed 365 days)</span></div>
+                    <div class="legend-item"><span class="legend-code">DVT</span><span>Seasonal SPT Diversion Desk / SPT Extra <span data-season-desk="DVT"></span></span></div>
+                </div>
+                <div class="legend-section">
                     <h4>SSOM Desks</h4>
                     <div class="legend-item"><span class="legend-code">A/B</span><span>SSOM SPT</span></div>
                     <div class="legend-item"><span class="legend-code">M/Z</span><span>SSOM Bridge</span></div>
@@ -382,6 +387,12 @@
                             style="background:#888; color:#fff;">Generate Preview</button>
                     <button class="btn" onclick="downloadAscentExport()" id="downloadExportBtn" disabled 
                             style="background:#888; color:#fff;">⬇️ Download CSV File</button>
+                </div>
+                <!-- ASCENT codes for desks whose code isn't a single letter (e.g. ATL, DVT) -->
+                <div id="ascentDeskCodesBox" style="display:none; margin-top:12px; padding:10px; background:#1a1a2e; border:1px solid #f0a500; border-radius:6px;">
+                    <div style="color:#f0a500; font-weight:bold; font-size:12px; margin-bottom:4px;">ASCENT desk codes</div>
+                    <div style="color:#888; font-size:11px; margin-bottom:8px;">What goes after the @ in ASCENT for these desks. Change it if ASCENT expects a different code - it's saved for this bid year. Click Generate Preview again after changing.</div>
+                    <div id="ascentDeskCodes"></div>
                 </div>
             </div>
             

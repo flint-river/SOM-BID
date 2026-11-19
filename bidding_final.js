@@ -410,9 +410,20 @@
         ).join('');
     }
 
+    // Fill season notes in the desk legend (e.g. DVT) from this year's pattern file
+    function renderDeskLegendSeasons() {
+        const fmt = s => { const p = s.split('-').map(Number); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][p[1]-1] + ' ' + p[2]; };
+        document.querySelectorAll('[data-season-desk]').forEach(el => {
+            const desk = el.getAttribute('data-season-desk');
+            const sd = (window.SEASONAL_DESKS || []).find(x => x.code && x.code.slice(-desk.length) === desk);
+            el.textContent = sd ? `(${fmt(sd.activeFrom)} - ${fmt(sd.activeTo)}; ${sd.outsideBecomes === 'XX' ? 'relief' : sd.outsideBecomes} rest of year)` : '';
+        });
+    }
+
     // Update year-specific text in the UI
     function updateYearSpecificText() {
         renderHolidayLegend();
+        renderDeskLegendSeasons();
         const bidYear = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : 2026;
         const bidYearShort = String(bidYear).slice(-2);
         const nextYearShort = String(bidYear + 1).slice(-2);
@@ -5710,8 +5721,8 @@ document.addEventListener('mousedown', function(e) {
         // Relief lines - use R format (placeholder)
         if (code === 'XXX' || code === 'XX') return '0900R2100';
         
-        // Parse the code: E05A, A06M, P12B, M18M, etc.
-        const match = code.match(/^([A-Z])(\d{2})([A-Z])$/);
+        // Parse the code: E05A, A06M, P12B, M18M, and multi-letter desks like P12ATL, P13DVT
+        const match = code.match(/^([A-Z])(\d{2})([A-Z]+)$/);
         if (!match) return 'OFF';
         
         const [, prefix, hourStr, desk] = match;
@@ -5724,7 +5735,81 @@ document.addEventListener('mousedown', function(e) {
         const startStr = String(startHour).padStart(2, '0') + '00';
         const endStr = String(endHour).padStart(2, '0') + '00';
         
-        return `${startStr}-${endStr}@${desk}`;
+        return `${startStr}-${endStr}@${ascentDeskCodes[desk] || desk}`;
+    }
+
+    // ---- ASCENT codes for multi-letter desks (ATL, DVT, ...) - editable, saved per bid year ----
+    let ascentDeskCodes = {};
+
+    function ascentDeskCodesPath() {
+        return (typeof BidYearIntegration !== 'undefined')
+            ? BidYearIntegration.getFirebaseDataPath('ascentDeskCodes')
+            : '/ascentDeskCodes.json';
+    }
+
+    // Desks in this year's patterns whose code ends in more than one letter, e.g. P12ATL -> ATL
+    function getMultiLetterDesks() {
+        const found = {};
+        (window.ANNUAL_BID || ANNUAL_BID || []).forEach(line => {
+            (line.days || []).forEach(code => {
+                const m = /^[A-Z](\d{2})([A-Z]{2,})$/.exec(code || '');
+                if (m) found[m[2]] = code;
+            });
+        });
+        return found; // { ATL: 'P12ATL', DVT: 'P13DVT' }
+    }
+
+    async function loadAscentDeskCodes() {
+        try {
+            const r = await fetch(`${FIREBASE_URL}${ascentDeskCodesPath()}`);
+            const data = r.ok ? await r.json() : null;
+            ascentDeskCodes = (data && typeof data === 'object') ? data : {};
+        } catch (e) {
+            ascentDeskCodes = {};
+        }
+        renderAscentDeskCodes();
+    }
+
+    function renderAscentDeskCodes() {
+        const box = document.getElementById('ascentDeskCodesBox');
+        const list = document.getElementById('ascentDeskCodes');
+        if (!box || !list) return;
+        const desks = getMultiLetterDesks();
+        const names = Object.keys(desks).sort();
+        box.style.display = names.length ? 'block' : 'none';
+        list.innerHTML = names.map(d => {
+            const hr = parseInt(desks[d].slice(1, 3), 10);
+            const shift = String(hr).padStart(2, '0') + '00-' + String((hr + 12) % 24).padStart(2, '0') + '00';
+            const val = ascentDeskCodes[d] || d;
+            return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:12px; color:#ccc;">
+                <span style="min-width:70px; color:#4ecca3; font-weight:bold;">${desks[d]}</span>
+                <span>${shift}@</span>
+                <input type="text" value="${val}" maxlength="8" data-desk="${d}"
+                    onchange="saveAscentDeskCode('${d}', this.value)"
+                    style="width:80px; padding:4px 6px; background:#0f3460; color:#fff; border:1px solid #4ecca3; border-radius:4px; text-transform:uppercase;">
+                <span id="ascentDeskStatus_${d}" style="color:#888; font-size:11px;">${ascentDeskCodes[d] ? 'custom' : 'default'}</span>
+            </div>`;
+        }).join('');
+    }
+
+    async function saveAscentDeskCode(desk, value) {
+        const clean = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (!clean || clean === desk) delete ascentDeskCodes[desk];
+        else ascentDeskCodes[desk] = clean;
+        const status = document.getElementById('ascentDeskStatus_' + desk);
+        try {
+            const r = await fetch(`${FIREBASE_URL}${ascentDeskCodesPath()}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ascentDeskCodes)
+            });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            renderAscentDeskCodes();
+            const s2 = document.getElementById('ascentDeskStatus_' + desk);
+            if (s2) { s2.textContent = 'saved - click Generate Preview again'; s2.style.color = '#4ecca3'; }
+        } catch (e) {
+            if (status) { status.textContent = 'NOT saved (' + e.message + ') - used for this export only'; status.style.color = '#e94560'; }
+        }
     }
 
     // Generate all dates for current bid year (Apr 1 to Mar 31)
@@ -5779,9 +5864,12 @@ document.addEventListener('mousedown', function(e) {
             }
         }
         
-        // No override, use regular pattern
+        // No override, use regular pattern (with seasonal desk rule, same as the calendar)
         const patternIndex = getPatternDayIndex(date);
-        const shiftCode = lineData.days[patternIndex];
+        let shiftCode = lineData.days[patternIndex];
+        if (typeof applySeasonalDesk === 'function') {
+            shiftCode = applySeasonalDesk(shiftCode, `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`);
+        }
         return translateShiftCode(shiftCode);
     }
     
@@ -5797,7 +5885,9 @@ document.addEventListener('mousedown', function(e) {
         document.getElementById('downloadExportBtn').disabled = true;
         document.getElementById('downloadExportBtn').style.background = '#888';
         document.getElementById('ascentExportPreview').style.display = 'none';
-        document.getElementById('employeeDataPaste').value = '';
+        const oldPaste = document.getElementById('employeeDataPaste'); // removed from page; guard
+        if (oldPaste) oldPaste.value = '';
+        loadAscentDeskCodes();
     }
     
     function hideAscentExport() {
@@ -6154,6 +6244,9 @@ document.addEventListener('mousedown', function(e) {
         } else {
             const patternIndex = getPatternDayIndex(date);
             shiftCode = lineData.days[patternIndex];
+            if (typeof applySeasonalDesk === 'function') {
+                shiftCode = applySeasonalDesk(shiftCode, dateKey);
+            }
         }
         
         // Translate to ASCENT display format (without @ and desk letter)
@@ -6172,8 +6265,8 @@ document.addEventListener('mousedown', function(e) {
         // Relief lines
         if (code === 'XXX' || code === 'XX') return 'Relief';
         
-        // Parse the code: E05A, A06M, P12B, M18M, etc.
-        const match = code.match(/^([A-Z])(\d{2})([A-Z])$/);
+        // Parse the code: E05A, A06M, P12B, M18M, and multi-letter desks like P12ATL, P13DVT
+        const match = code.match(/^([A-Z])(\d{2})([A-Z]+)$/);
         if (!match) return 'OFF';
         
         const [, prefix, hourStr, desk] = match;
