@@ -6016,6 +6016,9 @@ document.addEventListener('mousedown', function(e) {
     
     function showMaySummary() {
         if (!isAdmin) return;
+        const yr = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : new Date().getFullYear();
+        const lbl = document.getElementById('maySummaryYearLabel');
+        if (lbl) lbl.textContent = 'May ' + yr + ' (Bid ' + yr + '-' + (yr + 1) + ')';
         document.getElementById('maySummaryModal').classList.add('show');
     }
     
@@ -6079,6 +6082,11 @@ document.addEventListener('mousedown', function(e) {
         
         // Generate single combined table
         generateMayTableCombined('maySummaryCombined', allData, mayDates);
+        if (allData.length === 0) {
+            const tbl = document.getElementById('maySummaryCombined');
+            tbl.innerHTML += '<tbody><tr><td colspan="' + (mayDates.length + 2) + '" style="padding:20px; text-align:center; color:#f39c12; font-size:13px;">' +
+                'No lines assigned yet for Bid ' + bidYear + '-' + (bidYear + 1) + '. This report fills in as people bid.</td></tr></tbody>';
+        }
         
         document.getElementById('maySummaryContent').style.display = 'block';
         document.getElementById('printMaySummaryBtn').disabled = false;
