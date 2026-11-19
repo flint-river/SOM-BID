@@ -22,6 +22,8 @@ const BID_CONFIG = (function() {
     let currentBidYear = FALLBACK_BID_YEAR;
     let activeBidYear = null; // The year set by admin for all users
     let isAdminMode = false;
+    let initialized = false;   // set by init(); lets shared loaders know the year is settled
+    let readyPromise = null;
 
     /**
      * Fetch the active bid year from Firebase (set by admin)
@@ -99,7 +101,31 @@ const BID_CONFIG = (function() {
             console.warn('[BID_CONFIG] Bid year URL parameter ignored - admin authentication required');
         }
 
+        initialized = true;
         return getCurrentConfig();
+    }
+
+    function isInitialized() {
+        return initialized;
+    }
+
+    /**
+     * Make sure the bid year is settled before anything reads year-specific data.
+     * Safe to call from any page, any number of times. If the page already ran
+     * fetchActiveBidYear() + init() (e.g. bid_app_init.js), this does nothing,
+     * so an admin ?bidYear= override is never clobbered.
+     */
+    function ensureReady() {
+        if (initialized) return Promise.resolve(getCurrentConfig());
+        if (!readyPromise) {
+            readyPromise = (async () => {
+                try { await fetchActiveBidYear(); } catch (e) { /* fallback year */ }
+                let isAdmin = false;
+                try { isAdmin = sessionStorage.getItem('polish_bid_admin') === 'true'; } catch (e) {}
+                return init(isAdmin);
+            })();
+        }
+        return readyPromise;
     }
 
     /**
@@ -300,6 +326,8 @@ const BID_CONFIG = (function() {
     // Public API
     return {
         init,
+        ensureReady,
+        isInitialized,
         fetchActiveBidYear,
         setActiveBidYear,
         getActiveBidYear,

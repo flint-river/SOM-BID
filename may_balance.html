@@ -204,7 +204,8 @@
     <div class="header">
         <div class="header-content">
             <h1>⚖️ May Balance Admin</h1>
-            <p>Adjust May 2026 shifts to balance all lines to 152 work days</p>
+            <p>Adjust May shifts to balance all lines to 152 work days</p>
+            <div id="sourceBanner" style="margin-top:8px; padding:8px 12px; border-radius:6px; background:#333; color:#fff; font-size:13px;">Loading patterns...</div>
             <a href="index.html" style="display:inline-block; margin-top:12px; padding:10px 20px; background:#4ecca3; color:#1a1a2e; font-size:14px; font-weight:bold; text-decoration:none; border-radius:6px;">← Back to Main Bid</a>
         </div>
     </div>
@@ -318,8 +319,11 @@
 <script>
     // Load patterns when page loads
     document.addEventListener('DOMContentLoaded', async function() {
+        // Settle the bid year from Firebase before anything else
+        await BID_CONFIG.ensureReady();
+        HOLIDAYS = getMayHolidays();
         // Update page header with dynamic year
-        const bidYear = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : 2026;
+        const bidYear = BID_CONFIG.getBidYear();
         document.title = `May Balance Admin - Polish Bid ${bidYear}-${bidYear + 1}`;
         const headerP = document.querySelector('.header-content p');
         if (headerP) {
@@ -330,15 +334,53 @@
             try {
                 await PatternLoader.load('patterns.json');
                 console.log('[MayBalance] Loaded ' + ANNUAL_BID.length + ' lines');
+                loadWorkingOverrides(bidYear);
+                showSourceBanner(bidYear);
                 renderLinesList();
             } catch (err) {
                 console.error('[MayBalance] Failed to load patterns:', err);
+                const b = document.getElementById('sourceBanner');
+                b.style.background = '#e94560';
+                b.textContent = 'Could not load patterns for bid year ' + bidYear + ': ' + err.message + ' - do NOT balance until this is fixed.';
             }
         }
     });
 
-    // Working copy of overrides that we'll edit
-    let workingOverrides = JSON.parse(JSON.stringify(MAY_OVERRIDES));
+    // Working copy of THIS bid year's overrides (filled after patterns load)
+    let workingOverrides = {};
+    let droppedOverrides = [];
+
+    function loadWorkingOverrides(bidYear) {
+        const saved = (typeof MAY_OVERRIDES_BY_YEAR !== 'undefined' && MAY_OVERRIDES_BY_YEAR[String(bidYear)]) || {};
+        const validLines = new Set(ANNUAL_BID.map(l => l.lineNbr));
+        const mayPrefix = bidYear + '-5-';
+        workingOverrides = {};
+        droppedOverrides = [];
+        Object.keys(saved).forEach(lineNbr => {
+            Object.keys(saved[lineNbr]).forEach(dateStr => {
+                if (validLines.has(lineNbr) && dateStr.indexOf(mayPrefix) === 0) {
+                    (workingOverrides[lineNbr] = workingOverrides[lineNbr] || {})[dateStr] = saved[lineNbr][dateStr];
+                } else {
+                    droppedOverrides.push(lineNbr + ' ' + dateStr);
+                }
+            });
+        });
+        if (droppedOverrides.length) console.warn('[MayBalance] Ignored overrides that do not match current lines:', droppedOverrides);
+    }
+
+    function showSourceBanner(bidYear) {
+        const m = window.PATTERN_METADATA || {};
+        const c = m.counts || (PatternLoader.summarize ? PatternLoader.summarize(ANNUAL_BID) : {});
+        const parts = Object.keys(c).map(k => c[k] + ' ' + k).join(' / ');
+        const when = m.uploadedAt ? ' - uploaded ' + new Date(m.uploadedAt).toLocaleString() : (m.generatedAt ? ' - built ' + new Date(m.generatedAt).toLocaleString() : '');
+        const file = m.fileName ? ' (' + m.fileName + ')' : '';
+        const b = document.getElementById('sourceBanner');
+        const fromBackup = m.source !== 'firebase';
+        b.style.background = fromBackup ? '#e67e22' : '#2d6a4f';
+        b.textContent = 'Bid year ' + bidYear + '-' + (bidYear + 1) + ': ' + ANNUAL_BID.length + ' lines (' + parts + ') from ' +
+            (fromBackup ? 'BACKUP FILE in repo - Firebase copy not found' : 'Firebase ' + m.path) + file + when +
+            (droppedOverrides.length ? ' | ' + droppedOverrides.length + ' old override(s) ignored (see console)' : '');
+    }
     let selectedLine = null;
     let editingDay = null;
 
@@ -365,7 +407,7 @@
 
         return holidays;
     }
-    const HOLIDAYS = getMayHolidays();
+    let HOLIDAYS = {};   // set after the bid year is settled
 
     // Get display number from composite key (e.g., "5-SSOM" -> "5")
     function getDisplayNumber(lineNbr) {
@@ -684,15 +726,38 @@
     
     // Generate export code
     function updateExportCode() {
-        const bidYear = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : 2026;
-        let code = '// May ' + bidYear + ' overrides - manual adjustments to balance 152 work days per line\n';
-        code += 'const MAY_OVERRIDES = ';
-        code += JSON.stringify(workingOverrides, null, 2);
-        code += ';\n';
-        
+        const bidYear = String(BID_CONFIG.getBidYear());
+        const allYears = JSON.parse(JSON.stringify(
+            (typeof MAY_OVERRIDES_BY_YEAR !== 'undefined') ? MAY_OVERRIDES_BY_YEAR : {}));
+        allYears[bidYear] = workingOverrides;
+        let code = '// May overrides - manual adjustments to balance 152 work days per line.\n';
+        code += '// Keyed by BID YEAR so balancing one year can never overwrite another.\n';
+        code += '// Edit with may_balance.html and use its Download button; do not hand-edit.\n';
+        code += '// Last saved for bid year ' + bidYear + ' on ' + new Date().toLocaleString() + '\n';
+        code += 'const MAY_OVERRIDES_BY_YEAR = ' + JSON.stringify(allYears, null, 2) + ';\n\n';
+        code += MAY_OVERRIDES_TAIL;
         document.getElementById('exportCode').textContent = code;
     }
-    
+
+    const MAY_OVERRIDES_TAIL = [
+        "// Everything else in the app reads MAY_OVERRIDES; it always points at the",
+        "// active bid year's set (looked up live, so it follows BID_CONFIG).",
+        "const MAY_OVERRIDES = new Proxy({}, {",
+        "  get: function (t, k) { return mayOverridesForYear()[k]; },",
+        "  has: function (t, k) { return k in mayOverridesForYear(); },",
+        "  ownKeys: function () { return Object.keys(mayOverridesForYear()); },",
+        "  getOwnPropertyDescriptor: function (t, k) {",
+        "    var o = mayOverridesForYear();",
+        "    return (k in o) ? { value: o[k], enumerable: true, configurable: true } : undefined;",
+        "  }",
+        "});",
+        "function mayOverridesForYear() {",
+        "  var y = (typeof BID_CONFIG !== 'undefined') ? String(BID_CONFIG.getBidYear()) : '';",
+        "  return MAY_OVERRIDES_BY_YEAR[y] || {};",
+        "}",
+        ""
+    ].join('\n');
+
     function copyExportCode() {
         const code = document.getElementById('exportCode').textContent;
         navigator.clipboard.writeText(code).then(() => {
@@ -737,7 +802,7 @@
             workingOverrides = {};
             renderLinesList();
             if (selectedLine) renderMayEditor();
-            alert('All overrides cleared. Refresh the page to restore from file.');
+            alert('All overrides cleared for this bid year. Refresh the page to restore from file.');
         }
     }
     
@@ -748,10 +813,6 @@
         }
     });
     
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-        renderLinesList();
-    });
 </script>
 </body>
 </html>

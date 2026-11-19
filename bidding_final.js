@@ -752,12 +752,15 @@
                     console.log(`[PatternUpload] Seasonal desks loaded: ${window.SEASONAL_DESKS.map(sd => sd.code).join(', ')}`);
                 }
 
-                // Save to Firebase for persistence
-                const patternsPath = (typeof BidYearIntegration !== 'undefined')
-                    ? BidYearIntegration.getPatternsPath()
-                    : '/patterns.json';
+                // Save to Firebase for persistence (same path every page reads)
+                const patternsPath = (typeof PatternLoader !== 'undefined' && PatternLoader.getPatternsPath)
+                    ? PatternLoader.getPatternsPath()
+                    : BidYearIntegration.getPatternsPath();
+                const counts = PatternLoader.summarize ? PatternLoader.summarize(transformed) : {};
+                window.PATTERN_METADATA.counts = counts;
+                window.PATTERN_METADATA.path = patternsPath;
 
-                await fetch(`${FIREBASE_URL}${patternsPath}`, {
+                const putResp = await fetch(`${FIREBASE_URL}${patternsPath}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -765,9 +768,20 @@
                         metadata: window.PATTERN_METADATA
                     })
                 });
+                if (!putResp.ok) {
+                    throw new Error(`Firebase rejected the save (HTTP ${putResp.status}). Patterns are NOT saved.`);
+                }
 
-                console.log(`[PatternUpload] Uploaded ${transformed.length} lines from ${file.name}`);
-                showNotificationBanner(`Patterns uploaded: ${transformed.length} lines from ${file.name}`);
+                // Read it back to prove it landed
+                const checkPath = patternsPath.replace(/\.json$/, '') + '/metadata.json';
+                const check = await (await fetch(`${FIREBASE_URL}${checkPath}`)).json();
+                if (!check || check.uploadedAt !== window.PATTERN_METADATA.uploadedAt) {
+                    throw new Error('Saved, but read-back did not match. Reload and check before balancing.');
+                }
+
+                const countText = Object.keys(counts).map(k => `${counts[k]} ${k}`).join(' / ');
+                console.log(`[PatternUpload] Saved ${transformed.length} lines (${countText}) to ${patternsPath}`);
+                showNotificationBanner(`Patterns SAVED to ${patternsPath}: ${transformed.length} lines (${countText}) from ${file.name}`);
                 setSyncStatus('synced', 'Patterns uploaded');
 
                 // Regenerate calendar with new patterns

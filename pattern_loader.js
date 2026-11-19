@@ -257,16 +257,40 @@
     /**
      * Load patterns from Firebase first, then fall back to static file
      */
+    /**
+     * The ONE place that decides where patterns live in Firebase.
+     * Always year-specific: /bid{YEAR}/patterns.json. There is deliberately no
+     * fallback to the old top-level /patterns.json - that stale copy is what
+     * caused May Balance to show the wrong line count.
+     */
+    function getPatternsPath() {
+        return `/bid${BID_CONFIG.getBidYear()}/patterns.json`;
+    }
+
+    /** Count lines per group, e.g. { SSOM: 14, SOM: 87 } */
+    function summarize(lines) {
+        const counts = {};
+        (lines || []).forEach(l => {
+            const t = l.lineDesc || 'SOM';
+            counts[t] = (counts[t] || 0) + 1;
+        });
+        return counts;
+    }
+
+    /**
+     * Load patterns from Firebase first, then fall back to static file
+     */
     async function loadPatterns(url = 'patterns.json') {
+        // Settle the bid year first (no-op if the page already did it)
+        if (typeof BID_CONFIG !== 'undefined' && BID_CONFIG.ensureReady) {
+            await BID_CONFIG.ensureReady();
+        }
+        const bidYear = BID_CONFIG.getBidYear();
+
         // Try Firebase FIRST (for dynamic updates from admin)
         try {
-            const firebaseUrl = (typeof BID_CONFIG !== 'undefined')
-                ? BID_CONFIG.getFirebaseUrl()
-                : 'https://bid2026-58308-default-rtdb.firebaseio.com';
-
-            const patternsPath = (typeof BidYearIntegration !== 'undefined')
-                ? BidYearIntegration.getPatternsPath()
-                : '/patterns.json';
+            const firebaseUrl = BID_CONFIG.getFirebaseUrl();
+            const patternsPath = getPatternsPath();
 
             console.log(`[PatternLoader] Checking Firebase for patterns: ${patternsPath}`);
             const response = await fetch(`${firebaseUrl}${patternsPath}`);
@@ -279,6 +303,8 @@
                     window.ANNUAL_BID = firebaseData.data;
                     window.PATTERN_METADATA = firebaseData.metadata || {};
                     window.PATTERN_METADATA.source = 'firebase';
+                    window.PATTERN_METADATA.path = patternsPath;
+                    window.PATTERN_METADATA.counts = summarize(firebaseData.data);
 
                     // Handle seasonal desks from Firebase
                     window.SEASONAL_DESKS = firebaseData.metadata?.seasonalDesks || [];
@@ -311,6 +337,12 @@
                 const patternJson = await response.json();
                 console.log(`[PatternLoader] Loaded pattern data for bid year ${patternJson.bidYear?.start || 'unknown'}`);
 
+                // Never silently use a backup file built for a different bid year
+                const fileYear = parseInt(String(patternJson.bidYear?.start || '').slice(0, 4), 10);
+                if (fileYear && fileYear !== bidYear) {
+                    throw new Error(`Backup ${url} is for bid year ${fileYear}, not ${bidYear}`);
+                }
+
                 // Transform to ANNUAL_BID format
                 const annualBid = transformPatternData(patternJson);
                 console.log(`[PatternLoader] Transformed ${annualBid.length} lines`);
@@ -324,7 +356,9 @@
                     groups: patternJson.groups,
                     generatedAt: patternJson.generatedAt,
                     seasonalDesks: patternJson.seasonalDesks || [],
-                    source: 'local'
+                    source: 'local',
+                    path: url,
+                    counts: summarize(annualBid)
                 };
 
                 // Also store seasonalDesks at window level for easy access
@@ -406,6 +440,8 @@
     // Export functions
     window.PatternLoader = {
         load: loadPatterns,
+        getPatternsPath: getPatternsPath,
+        summarize: summarize,
         transform: transformPatternData,
         getDayCode: getDayCode,
         getLineColorCode: getLineColorCode,
