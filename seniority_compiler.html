@@ -355,7 +355,11 @@
             if (!selector) return;
 
             const currentYear = BID_CONFIG.getBidYear();
-            const years = [2026, 2027, 2028, 2029, 2030];
+            // Rolling list: previous year through 3 years ahead of the current bid year
+            const years = [];
+            for (let y = currentYear - 1; y <= currentYear + 3; y++) {
+                if (BID_CONFIG.isValidBidYear(y)) years.push(y);
+            }
 
             selector.innerHTML = `
                 <label style="color: #888; margin-right: 10px;">Setting up seniority for:</label>
@@ -383,11 +387,20 @@
             window.location.href = url.toString();
         }
 
+        // Settle the year (active year from Firebase unless ?bidYear= is in the URL)
+        // before showing anything, so a publish can never go to the wrong year.
+        const yearReady = BID_CONFIG.ensureReady().then(cfg => {
+            console.log(`[SeniorityCompiler] Bid Year settled: ${cfg.bidYear}`);
+            return cfg;
+        });
+
         if (sessionStorage.getItem('polish_bid_admin') === 'true') {
             document.getElementById('passwordModal').classList.remove('show');
             document.getElementById('mainContent').classList.remove('hidden');
-            initBidYearSelector();
-            checkForExistingDraft();
+            yearReady.then(() => {
+                initBidYearSelector();
+                checkForExistingDraft();
+            });
         }
 
         async function checkPassword() {
@@ -399,6 +412,7 @@
                 sessionStorage.setItem('polish_bid_admin', 'true');
                 document.getElementById('passwordModal').classList.remove('show');
                 document.getElementById('mainContent').classList.remove('hidden');
+                await yearReady;
                 initBidYearSelector();
                 checkForExistingDraft();
             } catch (e) { errorDiv.textContent = 'Incorrect password'; errorDiv.style.color = '#e94560'; }

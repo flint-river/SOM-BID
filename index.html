@@ -199,16 +199,8 @@
                     <div class="legend-item"><span class="legend-code">M/Z</span><span>SSOM Bridge</span></div>
                 </div>
                 <div class="legend-section">
-                    <h4>2026-2027 Holidays</h4>
-                    <div class="legend-item"><span class="legend-code">Pattern day 1</span><span>Super Bowl (02/14/2027)</span></div>
-                    <div class="legend-item"><span class="legend-code">Pattern day 2</span><span>Easter 2</span></div>
-                    <div class="legend-item"><span class="legend-code">Pattern day 3</span><span>St. Patrick's</span></div>
-                    <div class="legend-item"><span class="legend-code">Pattern day 4</span><span>Labor, Mom</span></div>
-                    <div class="legend-item"><span class="legend-code">Pattern day 5</span><span>Xmas, Easter 1</span></div>
-                    <div class="legend-item"><span class="legend-code">Pattern day 7</span><span>Memorial</span></div>
-                    <div class="legend-item"><span class="legend-code">Pattern day 10</span><span>Father's Day</span></div>
-                    <div class="legend-item"><span class="legend-code">Pattern day 11</span><span>July 4th</span></div>
-                    <div class="legend-item"><span class="legend-code">Pattern day 12</span><span>NYD, Thanksgiving</span></div>
+                    <h4 id="holidayLegendTitle">Holidays</h4>
+                    <div id="holidayLegendItems"><!-- filled from the bid year's holiday table --></div>
                 </div>
                 <div class="legend-section">
                     <h4>Status Indicators</h4>
@@ -338,7 +330,7 @@
                 <summary style="color:#4ecca3; font-weight:bold; cursor:pointer; padding:5px;">📋 CLICK HERE FOR STEP-BY-STEP INSTRUCTIONS</summary>
                 <div style="margin-top:15px; color:#ccc; font-size:12px; line-height:1.8;">
                     <h4 style="color:#f0a500; margin-bottom:10px;">🎯 WHAT THIS DOES:</h4>
-                    <p style="margin-bottom:15px;">Creates a CSV file that ASCENT can import with everyone's work schedule for the entire bid year (Apr 1, 2026 - Mar 31, 2027).</p>
+                    <p style="margin-bottom:15px;">Creates a CSV file that ASCENT can import with everyone's work schedule for the entire bid year (<span data-bid-range>Apr 1, 2026 - Mar 31, 2027</span>).</p>
                     
                     <h4 style="color:#f0a500; margin-bottom:10px;">📝 BEFORE YOU START:</h4>
                     <p style="margin-bottom:15px;">You need a <strong>seniority_work JSON file</strong> from the Seniority Compiler. This file contains the PPR (Worker IDs) from the PAFCA spreadsheet.</p>
@@ -363,7 +355,7 @@
             </details>
             
             <p style="color:#888; font-size:12px; margin-bottom:15px;">
-                Export bid assignments with full 365-day schedules (Apr 1, 2026 - Mar 31, 2027).
+                Export bid assignments with full-year schedules (<span data-bid-range>Apr 1, 2026 - Mar 31, 2027</span>).
                 <br><strong style="color:#4ecca3;">Load your seniority JSON file — it stays in your browser only, never saved to web.</strong>
             </p>
             
@@ -406,7 +398,7 @@
                     <p style="color:#ccc; font-size:11px; margin-top:5px;">These abbreviated names weren't found in your pasted data:</p>
                     <div id="unmatchedList" style="color:#e94560; font-size:12px; font-family:monospace; margin-top:5px;"></div>
                 </div>
-                <p style="color:#888; font-size:11px; margin-bottom:5px;">Preview (showing first 2 days of 365):</p>
+                <p style="color:#888; font-size:11px; margin-bottom:5px;">Preview (showing first 2 days of the bid year):</p>
                 <div style="max-height:300px; overflow-y:auto; background:#16213e; border-radius:5px; padding:10px;">
                     <table style="width:100%; font-size:11px; border-collapse:collapse;">
                         <thead>
@@ -424,7 +416,7 @@
                     </table>
                 </div>
                 <p style="color:#666; font-size:10px; margin-top:10px;">
-                    Full export includes: Header block + 365 date columns (Apr 1, 2026 - Mar 31, 2027)
+                    Full export includes: Header block + one column per day (<span data-bid-range>Apr 1, 2026 - Mar 31, 2027</span>)
                 </p>
             </div>
         </div>

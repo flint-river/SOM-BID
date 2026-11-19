@@ -436,10 +436,15 @@
 
             // Try Firebase first
             try {
+                // 2026: the main app saves to /bid/colorSettings.json; very old copies were top-level
                 const colorPath = bidYear === 2026
-                    ? '/colorSettings.json'
+                    ? '/bid/colorSettings.json'
                     : `/bid${bidYear}/colorSettings.json`;
-                const response = await fetch(`${baseUrl}${colorPath}`);
+                let response = await fetch(`${baseUrl}${colorPath}`);
+                if (bidYear === 2026) {
+                    const peek = response.ok ? await response.clone().json() : null;
+                    if (!peek) response = await fetch(`${baseUrl}/colorSettings.json`);
+                }
                 if (response.ok) {
                     const settings = await response.json();
                     if (settings) {
@@ -482,10 +487,15 @@
 
             // Try Firebase first
             try {
+                // 2026: the main app saves to /bid/customGroups.json; very old copies were top-level
                 const groupPath = bidYear === 2026
-                    ? '/customGroups.json'
+                    ? '/bid/customGroups.json'
                     : `/bid${bidYear}/customGroups.json`;
-                const response = await fetch(`${baseUrl}${groupPath}`);
+                let response = await fetch(`${baseUrl}${groupPath}`);
+                if (bidYear === 2026) {
+                    const peek = response.ok ? await response.clone().json() : null;
+                    if (!peek) response = await fetch(`${baseUrl}/customGroups.json`);
+                }
                 if (response.ok) {
                     const groups = await response.json();
                     if (groups) {
@@ -958,12 +968,21 @@
         // Load patterns directly from Firebase for non-default years
         async function loadPatternsFromFirebase() {
             const firebaseUrl = BID_CONFIG.getFirebaseUrl();
-            const patternsPath = BidYearIntegration.getPatternsPath();
+            let patternsPath = BidYearIntegration.getPatternsPath();
 
             console.log(`[YearTimeline] Loading patterns from Firebase: ${patternsPath}`);
 
             try {
-                const response = await fetch(`${firebaseUrl}${patternsPath}`);
+                let response = await fetch(`${firebaseUrl}${patternsPath}`);
+                // Bid year 2026 predates per-year folders - its patterns may be top-level
+                if (BID_CONFIG.getBidYear() === 2026) {
+                    const peek = response.ok ? await response.clone().json() : null;
+                    if (!peek || (!(peek.data && peek.data.length) && !peek.lines)) {
+                        patternsPath = '/patterns.json';
+                        console.log(`[YearTimeline] 2026 legacy: checking ${patternsPath}`);
+                        response = await fetch(`${firebaseUrl}${patternsPath}`);
+                    }
+                }
                 if (response.ok) {
                     const firebaseData = await response.json();
 
@@ -1013,6 +1032,8 @@
 
                 // Initialize BID_CONFIG with admin mode if bidYear param present
                 BID_CONFIG.init(hasBidYearParam);
+                // Pick up the admin-set active year (keeps a ?bidYear= choice)
+                await BID_CONFIG.ensureReady();
 
                 // Load color settings to match main app
                 await loadColorSettings();

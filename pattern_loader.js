@@ -290,10 +290,21 @@
         // Try Firebase FIRST (for dynamic updates from admin)
         try {
             const firebaseUrl = BID_CONFIG.getFirebaseUrl();
-            const patternsPath = getPatternsPath();
+            let patternsPath = getPatternsPath();
 
             console.log(`[PatternLoader] Checking Firebase for patterns: ${patternsPath}`);
-            const response = await fetch(`${firebaseUrl}${patternsPath}`);
+            let response = await fetch(`${firebaseUrl}${patternsPath}`);
+
+            // Bid year 2026 predates per-year folders: every other 2026 path is
+            // top-level (/bid.json, /seniority.json), so its patterns may be too.
+            if (bidYear === 2026) {
+                const peek = response.ok ? await response.clone().json() : null;
+                if (!peek || !peek.data || !peek.data.length) {
+                    patternsPath = '/patterns.json';
+                    console.log(`[PatternLoader] 2026 legacy: checking ${patternsPath}`);
+                    response = await fetch(`${firebaseUrl}${patternsPath}`);
+                }
+            }
 
             if (response.ok) {
                 const firebaseData = await response.json();

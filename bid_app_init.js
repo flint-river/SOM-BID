@@ -106,7 +106,9 @@
      * Update page title with current bid year
      */
     function updatePageTitle() {
-        const title = BID_CONFIG.getDisplayTitle();
+        const title = BID_CONFIG.getDisplayTitle();            // e.g. "2027-2028 Bid"
+        const yearRange = title.replace(/\s*Bid$/, '');         // e.g. "2027-2028"
+
 
         // Update document title
         document.title = `${title} - Polish Bid System`;
@@ -115,14 +117,14 @@
         const headers = document.querySelectorAll('.bid-year-title, h1.title, .main-title');
         headers.forEach(el => {
             if (el.textContent.includes('BID') || el.textContent.includes('Bid')) {
-                el.textContent = el.textContent.replace(/\d{4}-\d{4}|\d{4}/, title);
+                el.textContent = el.textContent.replace(/\d{4}-\d{4}|\d{4}/, yearRange);
             }
         });
 
         // Update specific elements by ID
         const bidYearEl = document.getElementById('bidYearDisplay');
         if (bidYearEl) {
-            bidYearEl.textContent = title;
+            bidYearEl.textContent = yearRange;
         }
 
         // Update date range display

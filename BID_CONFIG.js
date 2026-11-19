@@ -22,7 +22,8 @@ const BID_CONFIG = (function() {
     let currentBidYear = FALLBACK_BID_YEAR;
     let activeBidYear = null; // The year set by admin for all users
     let isAdminMode = false;
-    let initialized = false;   // set by init(); lets shared loaders know the year is settled
+    let initialized = false;   // set by init()
+    let activeFetched = false; // set once the admin-set active year has been asked for
     let readyPromise = null;
 
     /**
@@ -36,13 +37,16 @@ const BID_CONFIG = (function() {
                 const year = await response.json();
                 if (year && isValidBidYear(year)) {
                     activeBidYear = year;
-                    currentBidYear = year;
+                    // Never override an admin ?bidYear= choice that init() already applied
+                    if (!isAdminMode) currentBidYear = year;
                     console.log(`[BID_CONFIG] Active bid year from Firebase: ${year}`);
                     return year;
                 }
             }
         } catch (err) {
             console.log('[BID_CONFIG] Could not fetch active bid year, using fallback');
+        } finally {
+            activeFetched = true;
         }
         return FALLBACK_BID_YEAR;
     }
@@ -110,19 +114,24 @@ const BID_CONFIG = (function() {
     }
 
     /**
-     * Make sure the bid year is settled before anything reads year-specific data.
-     * Safe to call from any page, any number of times. If the page already ran
-     * fetchActiveBidYear() + init() (e.g. bid_app_init.js), this does nothing,
-     * so an admin ?bidYear= override is never clobbered.
+     * Settle the bid year before anything reads or writes year-specific data:
+     * 1) ask Firebase for the admin-set active year (once), 2) apply an admin
+     * ?bidYear= override. Safe to call from every page, any number of times,
+     * in any order with init()/fetchActiveBidYear() - the result is the same.
      */
     function ensureReady() {
-        if (initialized) return Promise.resolve(getCurrentConfig());
+        if (initialized && activeFetched) return Promise.resolve(getCurrentConfig());
         if (!readyPromise) {
             readyPromise = (async () => {
-                try { await fetchActiveBidYear(); } catch (e) { /* fallback year */ }
-                let isAdmin = false;
-                try { isAdmin = sessionStorage.getItem('polish_bid_admin') === 'true'; } catch (e) {}
-                return init(isAdmin);
+                if (!activeFetched) {
+                    try { await fetchActiveBidYear(); } catch (e) { /* fallback year */ }
+                }
+                if (!initialized) {
+                    let isAdmin = false;
+                    try { isAdmin = sessionStorage.getItem('polish_bid_admin') === 'true'; } catch (e) {}
+                    init(isAdmin);
+                }
+                return getCurrentConfig();
             })();
         }
         return readyPromise;
@@ -132,7 +141,7 @@ const BID_CONFIG = (function() {
      * Check if a bid year is valid (reasonable range)
      */
     function isValidBidYear(year) {
-        return year >= 2025 && year <= 2051; // Matches ALL_HOLIDAYS_DATA range
+        return year >= 2025 && year <= 2050; // ALL_HOLIDAYS_DATA covers bid years 2025-2026 .. 2050-2051
     }
 
     /**

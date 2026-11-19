@@ -182,6 +182,13 @@
     let currentCalendarLine = null;
 
     document.addEventListener('DOMContentLoaded', async () => {
+        // Settle the bid year BEFORE any year-specific read. Without this, the
+        // first loads used the built-in fallback year instead of the active year
+        // (or an admin's ?bidYear= choice) and could mix or overwrite years.
+        if (typeof BID_CONFIG !== 'undefined' && BID_CONFIG.ensureReady) {
+            await BID_CONFIG.ensureReady();
+        }
+
         // Start cloud data loading FIRST (doesn't depend on settings)
         console.log('[BidApp] Starting parallel data loading...');
         var cloudPromise = initCloud();
@@ -371,8 +378,41 @@
         console.log(`[BidApp] Rendered holiday subheaders with ${Object.keys(holidayMap).length} holidays`);
     }
 
+    // Build the header legend from the bid year's own holiday table
+    // (was hard-coded to 2026-2027 pattern days)
+    function renderHolidayLegend() {
+        const box = document.getElementById('holidayLegendItems');
+        if (!box || typeof ALL_HOLIDAYS_DATA === 'undefined') return;
+        const bidYear = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : new Date().getFullYear();
+        const title = document.getElementById('holidayLegendTitle');
+        if (title) title.textContent = `${bidYear}-${bidYear + 1} Holidays`;
+        const yearData = ALL_HOLIDAYS_DATA[`${bidYear}-${bidYear + 1}`];
+        if (!yearData || !yearData.holidays) {
+            box.innerHTML = '<div class="legend-item"><span>No holiday data for this bid year</span></div>';
+            return;
+        }
+        const shortNames = {
+            SUPER: 'Super Bowl', EAST1: 'Easter 1', EAST2: 'Easter 2', STPAT: "St. Patrick's",
+            LABOR: 'Labor', MOM: 'Mom', XMAS: 'Xmas', MEMOR: 'Memorial', DAD: "Father's Day",
+            '4TH': 'July 4th', NYD: 'NYD', THX: 'Thanksgiving'
+        };
+        const byDay = {};
+        yearData.holidays.forEach(h => {
+            let label = shortNames[h.abbrev] || h.name;
+            if (h.abbrev === 'SUPER') {
+                const p = h.date.split('-');
+                label += ` (${p[1]}/${p[2]}/${p[0]})`;
+            }
+            (byDay[h.patternDay] = byDay[h.patternDay] || []).push(label);
+        });
+        box.innerHTML = Object.keys(byDay).map(Number).sort((a, b) => a - b).map(d =>
+            `<div class="legend-item"><span class="legend-code">Pattern day ${d}</span><span>${byDay[d].join(', ')}</span></div>`
+        ).join('');
+    }
+
     // Update year-specific text in the UI
     function updateYearSpecificText() {
+        renderHolidayLegend();
         const bidYear = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : 2026;
         const bidYearShort = String(bidYear).slice(-2);
         const nextYearShort = String(bidYear + 1).slice(-2);
@@ -381,6 +421,9 @@
         // Update all elements with year-range data attribute or specific patterns
         document.querySelectorAll('[data-year-range]').forEach(el => {
             el.textContent = `${bidYear}-${bidYear + 1}`;
+        });
+        document.querySelectorAll('[data-bid-range]').forEach(el => {
+            el.textContent = dateRangeText;
         });
 
         // Update any text containing "Apr 1, 2026 - Mar 31, 2027" pattern
@@ -5963,8 +6006,8 @@ document.addEventListener('mousedown', function(e) {
         }
         
         // Header block - dynamic bid year
-        const bidYearStart = 2026;
-        const bidYearEnd = (bidYearStart + 1) % 100; // 27
+        const bidYearStart = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : new Date().getFullYear();
+        const bidYearEnd = (bidYearStart + 1) % 100; // e.g. 28 for bid year 2027
         const bidYearStr = bidYearStart + '-' + (bidYearEnd < 10 ? '0' + bidYearEnd : bidYearEnd);
         
         lines.push('Work schedule,' + bidYearStr + 'SOM');
@@ -5998,7 +6041,7 @@ document.addEventListener('mousedown', function(e) {
         // Generate filename with date
         const today = new Date();
         const dateStr = today.toISOString().split('T')[0];
-        const filename = `polish_bid_ascent_2026-27_${dateStr}.csv`;
+        const filename = `polish_bid_ascent_${bidYearStr}_${dateStr}.csv`;
         
         // Download as CSV file
         const blob = new Blob([csv], { type: 'text/csv' });
@@ -8462,12 +8505,20 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
         document.getElementById('escalationModal').classList.remove('show');
     }
     
+    // Escalation is stored in one shared spot; it is stamped with its bid year
+    // so one year's escalation never shows up (or gets acted on) in another year.
+    // Older records without a year stamp are still honored.
+    function escalationIsForThisYear(data) {
+        if (!data || data.bidYear === undefined || typeof BID_CONFIG === 'undefined') return true;
+        return Number(data.bidYear) === BID_CONFIG.getBidYear();
+    }
+
     function loadEscalationStatus() {
         // Load escalation state from Firebase if it exists
         fetch(`${FIREBASE_URL}/escalation.json`)
             .then(response => response.json())
             .then(data => {
-                if (data && data.active) {
+                if (data && data.active && escalationIsForThisYear(data)) {
                     escalationData = { ...escalationData, ...data };
                     vacantLines = data.vacantLines || { ssom: [], som: [] };
                     updateEscalationStatusDisplay();
@@ -8682,7 +8733,8 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...escalationData,
-                    vacantLines: vacantLines
+                    vacantLines: vacantLines,
+                    bidYear: typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : undefined
                 })
             });
         } catch (err) {
@@ -9097,7 +9149,9 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
             .then(response => response.json())
             .then(data => {
                 console.log('ESCALATION CHECK: Data received:', data);
-                if (data && data.active) {
+                if (data && data.active && !escalationIsForThisYear(data)) {
+                    console.log(`ESCALATION CHECK: Active escalation belongs to bid year ${data.bidYear}, not this one - ignored`);
+                } else if (data && data.active) {
                     console.log('ESCALATION CHECK: Active! Showing banner...');
                     escalationData = { ...escalationData, ...data };
                     vacantLines = data.vacantLines || { ssom: [], som: [] };
