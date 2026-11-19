@@ -1048,6 +1048,90 @@
         }).join('');
     }
 
+    // ---- Annual work days per line (includes May changes and seasonal desks) ----
+    // Shown subtly: under 152 = yellow, 152 = green, over 152 = blue. Every shift is 12 hours.
+    var WORK_DAY_TARGET = 152;      // contract: 152 work days per year (12-hour shifts)
+
+    function getLineWorkDays(lineKey) {
+        var cal = (typeof ALL_LINES_CALENDAR !== 'undefined' && ALL_LINES_CALENDAR) ? ALL_LINES_CALENDAR[lineKey] : null;
+        if (!cal || !cal.days) return null;
+        var n = 0;
+        for (var d in cal.days) {
+            var s = cal.days[d].s;
+            if (s && s !== '--' && s !== '-') n++;
+        }
+        return n;
+    }
+
+    function workDaysClass(n) {
+        return n < WORK_DAY_TARGET ? 'wd-under' : (n > WORK_DAY_TARGET ? 'wd-over' : 'wd-even');
+    }
+
+    function workDaysTitle(n) {
+        var diff = n - WORK_DAY_TARGET;
+        return n + ' work days' + (diff === 0 ? ' - balanced' : ' - ' + Math.abs(diff) + (diff > 0 ? ' over ' : ' under ') + WORK_DAY_TARGET);
+    }
+
+    function workDaysBadge(lineKey) {
+        var n = getLineWorkDays(lineKey);
+        if (n === null) return '';
+        return '<span class="wd-badge ' + workDaysClass(n) + '" data-wd-line="' + lineKey + '">' + n + '</span>';
+    }
+
+    // Larger hover card for the work-day numbers: days and hours vs. contract
+    function signed(v) { return (v > 0 ? '+' : v < 0 ? '-' : '') + Math.abs(v).toLocaleString('en-US'); }
+
+    function workDaysCardHTML(lineKey) {
+        var n = getLineWorkDays(lineKey);
+        if (n === null) return '';
+        var dDays = n - WORK_DAY_TARGET;
+        var cls = workDaysClass(n);
+        var num = (typeof getDisplayNumber === 'function') ? getDisplayNumber(lineKey) : lineKey;
+        var type = String(lineKey).split('-')[1] || '';
+        var diffText = dDays === 0 ? 'Balanced' : signed(dDays) + (Math.abs(dDays) === 1 ? ' day' : ' days');
+        return '<div class="wd-card-title">Line ' + num + ' ' + type + '</div>' +
+            '<div class="wd-card-big ' + cls + '">' + n + ' work days</div>' +
+            '<div class="wd-card-row">Contract: ' + WORK_DAY_TARGET + ' days</div>' +
+            '<div class="wd-card-row ' + cls + '">Difference: ' + diffText + '</div>';
+    }
+
+    (function setupWorkDaysCard() {
+        var card = null;
+        function ensure() {
+            if (!card) {
+                card = document.createElement('div');
+                card.id = 'wdCard';
+                document.body.appendChild(card);
+            }
+            return card;
+        }
+        document.addEventListener('mouseover', function (e) {
+            var t = e.target.closest && e.target.closest('[data-wd-line]');
+            if (!t) return;
+            var html = workDaysCardHTML(t.getAttribute('data-wd-line'));
+            if (!html) return;
+            var c = ensure();
+            c.innerHTML = html;
+            c.style.display = 'block';
+            var r = t.getBoundingClientRect();
+            var left = Math.min(r.right + 10, window.innerWidth - c.offsetWidth - 10);
+            var top = Math.min(r.top - 10, window.innerHeight - c.offsetHeight - 10);
+            c.style.left = Math.max(10, left) + 'px';
+            c.style.top = Math.max(10, top) + 'px';
+        });
+        document.addEventListener('mouseout', function (e) {
+            var t = e.target.closest && e.target.closest('[data-wd-line]');
+            if (t && card && !(e.relatedTarget && t.contains(e.relatedTarget))) card.style.display = 'none';
+        });
+        document.addEventListener('scroll', function () { if (card) card.style.display = 'none'; }, true);
+    })();
+
+    // Total holidays in this bid year (was hard-coded as 12; e.g. 2027-2028 has 10)
+    function getHolidayTotal() {
+        var h = window.HOLIDAYS || (typeof HOLIDAYS !== 'undefined' ? HOLIDAYS : {}) || {};
+        return Object.keys(h).length || 12;
+    }
+
     function renderAllLines() {
         var container = document.getElementById('allLinesList');
         var lineToBidder = getLineToBidder();
@@ -1077,7 +1161,7 @@
             var favClass = isFavorite ? ' favorite' : '';
 
             return '<div class="line-row ' + (isTaken ? 'taken' : '') + favClass + hiddenClass + '">' +
-                '<div class="line-nbr">' + displayNum + '</div>' +
+                '<div class="line-nbr">' + displayNum + workDaysBadge(lineKey) + '</div>' +
                 '<div class="fav-star ' + (isFavorite ? 'active' : 'inactive') + '" onclick="toggleFavorite(\'' + lineKey + '\')">★</div>' +
                 '<div class="line-desc line-desc-clickable" style="background:' + lineColor + '; color:' + lineTextColor + ';" onclick="showCalendar(\'' + lineKey + '\')">' + line.lineDesc + '</div>' +
                 '<div class="line-bidder ' + (isTaken ? 'taken' : 'available') + '">' + (isTaken && isLineConfirmed(lineKey) ? '🔒 ' : '') + (bidder || 'Available') + '</div>' +
@@ -3037,6 +3121,16 @@ function isLineConfirmed(lineNbr) {
         }
 
         document.getElementById('calendarTitle').textContent = `Year Calendar - Line ${displayNum} (${lineType})${assignedTo}`;
+        (function () {
+            var el = document.getElementById('calendarWorkDays');
+            var n = getLineWorkDays(lineNbr);
+            if (!el) return;
+            if (n === null) { el.textContent = ''; return; }
+            el.className = 'wd-badge-inline ' + workDaysClass(n);
+            el.textContent = n + ' days';
+            el.removeAttribute('title');
+            el.setAttribute('data-wd-line', lineNbr);
+        })();
 
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
@@ -3266,7 +3360,7 @@ function isLineConfirmed(lineNbr) {
         summaryRows.push(['Statistics:']);
         summaryRows.push(['Work Days:', workDays]);
         summaryRows.push(['Off Days:', offDays]);
-        summaryRows.push(['Holidays Off:', holidaysOff + ' of 12']);
+        summaryRows.push(['Holidays Off:', holidaysOff + ' of ' + getHolidayTotal()]);
         summaryRows.push([]);
 
         // 12-Day Pattern
@@ -3832,7 +3926,7 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
         <table class="summary-table">
             <tr><td class="label">Work Days</td><td>${workDays}</td></tr>
             <tr><td class="label">Off Days</td><td>${offDays}</td></tr>
-            <tr><td class="label">Holidays Off</td><td>${holidaysOff} of 12</td></tr>
+            <tr><td class="label">Holidays Off</td><td>${holidaysOff} of ${getHolidayTotal()}</td></tr>
         </table>
 
         <h3>12-Day Pattern</h3>
@@ -7598,7 +7692,7 @@ document.addEventListener('mousedown', function(e) {
         html += '<div class="stats">';
         html += '<div class="stat-box"><div class="stat-value">' + workDays + '</div><div class="stat-label">Work Days</div></div>';
         html += '<div class="stat-box"><div class="stat-value">' + offDays + '</div><div class="stat-label">Off Days</div></div>';
-        html += '<div class="stat-box"><div class="stat-value">' + holidaysOff + '/12</div><div class="stat-label">Holidays Off</div></div>';
+        html += '<div class="stat-box"><div class="stat-value">' + holidaysOff + '/' + getHolidayTotal() + '</div><div class="stat-label">Holidays Off</div></div>';
         html += '</div>';
         
         if (ptoDates.length > 0) {

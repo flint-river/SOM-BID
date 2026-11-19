@@ -211,6 +211,7 @@
                 <div class="legend-section">
                     <h4>Status Indicators</h4>
                     <div class="legend-item"><span class="legend-code">🔒</span><span>Line Confirmed</span></div>
+                    <div class="legend-item"><span class="legend-code"><span class="wd-badge wd-under">151</span> <span class="wd-badge wd-even">152</span> <span class="wd-badge wd-over">153</span></span><span>Annual work days (under / at / over 152)</span></div>
                 </div>
             </div>
             <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #0f3460; font-size: 11px; color: #888;">
@@ -222,7 +223,7 @@
     <div class="modal-overlay" id="calendarModal" onclick="hideCalendar()">
         <div class="calendar-modal" onclick="event.stopPropagation()">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3 id="calendarTitle" style="margin:0;">Year Calendar</h3>
+                <h3 style="margin:0;"><span id="calendarTitle">Year Calendar</span> <span id="calendarWorkDays"></span></h3>
                 <div>
                     <button class="btn btn-legend" onclick="toggleCalendarView()" style="margin-right:10px; background:#9b59b6; color:white;">📅 Toggle View</button>
                     <button class="btn btn-legend" onclick="copyCalendarLink()" style="margin-right:10px;">🔗 Copy Link</button>
