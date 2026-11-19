@@ -188,6 +188,17 @@
             <p id="pageSubtitle">Loading...</p>
         </div>
 
+        <!-- Admin-only: bid schedule settings (saved per bid year in Firebase) -->
+        <div id="scheduleEditor" style="display:none; background:#fffbea; border-bottom:2px solid #f6ad55; padding:14px 20px; font-size:14px; color:#2d3748;">
+            <strong style="color:#c05621;">Admin - Bid Schedule:</strong>
+            <label style="margin-left:12px;">Start date <input type="date" id="schedDate" style="padding:4px;"></label>
+            <label style="margin-left:12px;">Start time <input type="time" id="schedTime" step="300" style="padding:4px;"></label>
+            <label style="margin-left:12px;">Minutes per person <input type="number" id="schedInterval" min="1" max="120" style="width:60px; padding:4px;"></label>
+            <button id="schedSaveBtn" onclick="saveBidSchedule()" style="margin-left:12px; padding:6px 14px; background:#c05621; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Save</button>
+            <button onclick="resetBidSchedule()" style="margin-left:6px; padding:6px 10px; background:#a0aec0; color:#fff; border:none; border-radius:4px; cursor:pointer;">Default</button>
+            <span id="schedStatus" style="margin-left:10px; font-size:12px; color:#718096;"></span>
+        </div>
+
         <div class="info-banner" id="infoBanner">
             Loading bid schedule...
         </div>
@@ -268,9 +279,98 @@
             return false;
         }
 
+        // ---- Bid schedule settings: saved per bid year at /bid{YEAR}/bidSchedule ----
+        // Default if nothing saved: January 6 of the bid year, 05:00, 10 minutes per person
+        var BID_SCHEDULE = null;
+
+        function defaultBidSchedule() {
+            var bidYear = BID_CONFIG.getBidYear();
+            return { date: bidYear + '-01-06', time: '05:00', interval: 10 };
+        }
+
+        function bidSchedulePath() {
+            return (typeof BidYearIntegration !== 'undefined')
+                ? BidYearIntegration.getFirebaseDataPath('bidSchedule')
+                : '/bidSchedule.json';
+        }
+
+        function isValidSchedule(s) {
+            return s && /^\d{4}-\d{2}-\d{2}$/.test(s.date) && /^\d{2}:\d{2}$/.test(s.time) &&
+                   Number(s.interval) >= 1 && Number(s.interval) <= 120;
+        }
+
+        async function loadBidSchedule() {
+            BID_SCHEDULE = defaultBidSchedule();
+            BID_SCHEDULE.isDefault = true;
+            try {
+                var r = await fetch(BID_CONFIG.getFirebaseUrl() + bidSchedulePath());
+                var data = r.ok ? await r.json() : null;
+                if (isValidSchedule(data)) {
+                    BID_SCHEDULE = { date: data.date, time: data.time, interval: Number(data.interval), isDefault: false };
+                }
+            } catch (e) {
+                console.log('Could not load bid schedule, using default');
+            }
+        }
+
         function getBidStartDate() {
-            var bidYear = typeof BID_CONFIG !== 'undefined' ? BID_CONFIG.getBidYear() : 2026;
-            return new Date(bidYear, 0, 6, 5, 0, 0);
+            var d = BID_SCHEDULE.date.split('-').map(Number);
+            var t = BID_SCHEDULE.time.split(':').map(Number);
+            return new Date(d[0], d[1] - 1, d[2], t[0], t[1], 0);
+        }
+
+        function isAdminViewer() {
+            try { return sessionStorage.getItem('polish_bid_admin') === 'true'; } catch (e) { return false; }
+        }
+
+        function fillScheduleEditor() {
+            document.getElementById('schedDate').value = BID_SCHEDULE.date;
+            document.getElementById('schedTime').value = BID_SCHEDULE.time;
+            document.getElementById('schedInterval').value = BID_SCHEDULE.interval;
+            document.getElementById('schedStatus').textContent = BID_SCHEDULE.isDefault
+                ? 'Using default (Jan 6, 05:00, 10 min) - not saved yet'
+                : 'Saved for ' + BID_CONFIG.getBidYear() + '-' + (BID_CONFIG.getBidYear() + 1);
+        }
+
+        async function saveBidSchedule() {
+            var s = {
+                date: document.getElementById('schedDate').value,
+                time: document.getElementById('schedTime').value,
+                interval: parseInt(document.getElementById('schedInterval').value, 10)
+            };
+            var status = document.getElementById('schedStatus');
+            if (!isValidSchedule(s)) {
+                status.textContent = 'Check the date, time, and minutes (1-120)';
+                status.style.color = '#e53e3e';
+                return;
+            }
+            status.textContent = 'Saving...'; status.style.color = '#718096';
+            try {
+                var r = await fetch(BID_CONFIG.getFirebaseUrl() + bidSchedulePath(), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: s.date, time: s.time, interval: s.interval, savedAt: new Date().toISOString() })
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                BID_SCHEDULE = { date: s.date, time: s.time, interval: s.interval, isDefault: false };
+                renderSchedule();
+                fillScheduleEditor();
+                status.textContent = 'Saved - everyone sees the new times on refresh';
+                status.style.color = '#2f855a';
+            } catch (e) {
+                status.textContent = 'NOT saved (' + e.message + ')';
+                status.style.color = '#e53e3e';
+            }
+        }
+
+        function resetBidSchedule() {
+            var d = defaultBidSchedule();
+            document.getElementById('schedDate').value = d.date;
+            document.getElementById('schedTime').value = d.time;
+            document.getElementById('schedInterval').value = d.interval;
+            var status = document.getElementById('schedStatus');
+            status.textContent = 'Default filled in - click Save to apply';
+            status.style.color = '#c05621';
         }
 
         function formatBidTime(date) {
@@ -305,7 +405,7 @@
                     '<div class="name">' + name + '</div>' +
                     '<div class="bid-time">' + formatBidTime(currentTime) + '</div>';
                 container.appendChild(row);
-                currentTime = new Date(currentTime.getTime() + 10 * 60 * 1000);
+                currentTime = new Date(currentTime.getTime() + BID_SCHEDULE.interval * 60 * 1000);
             });
 
             return currentTime;
@@ -316,7 +416,11 @@
             var loaded = await loadSeniorityLists();
 
             var bidYear = BID_CONFIG.getBidYear();
-            var bidStartDate = getBidStartDate();
+            await loadBidSchedule();
+            if (isAdminViewer()) {
+                document.getElementById('scheduleEditor').style.display = 'block';
+                fillScheduleEditor();
+            }
 
             // Update page title and headers with correct bid year
             document.title = bidYear + '-' + (bidYear + 1) + ' Bid Times';
@@ -341,9 +445,15 @@
                 return;
             }
 
+            renderSchedule();
+        });
+
+        function renderSchedule() {
+            var bidStartDate = getBidStartDate();
             var totalPeople = SSOM_PERSONNEL.length + SOM_PERSONNEL.length;
             document.getElementById('infoBanner').innerHTML = '<strong>Bidding starts:</strong> ' + formatLongDate(bidStartDate) +
-                ' at 05:00 | <strong>Interval:</strong> 10 minutes per person | <strong>Total:</strong> ' +
+                ' at ' + BID_SCHEDULE.time +
+                ' | <strong>Interval:</strong> ' + BID_SCHEDULE.interval + ' minutes per person | <strong>Total:</strong> ' +
                 totalPeople + ' people';
 
             document.getElementById('ssomHeader').textContent = '👔 SSOM Lines (Senior System Operations Manager) - ' + SSOM_PERSONNEL.length + ' Lines';
@@ -352,9 +462,10 @@
             var ssomContainer = document.getElementById('ssomContainer');
             generateBidRows(ssomContainer, SSOM_PERSONNEL, bidStartDate);
 
+            // SSOM and SOM lists both start at the start time (same as before)
             var somContainer = document.getElementById('somContainer');
             generateBidRows(somContainer, SOM_PERSONNEL, bidStartDate);
-        });
+        }
     </script>
 </body>
 </html>
