@@ -382,6 +382,8 @@
                     <option value="favorites">Favorites Only</option>
                     <option value="ssom">SSOMs Only</option>
                     <option value="som">SOMs Only</option>
+                    <option value="ssom-open" id="optSsomOpen">SSOM Lines Not Bid Yet</option>
+                    <option value="som-open" id="optSomOpen">SOM Lines Not Bid Yet</option>
                 </select>
             </div>
             <button class="control-btn" onclick="scrollToToday()">Today</button>
@@ -937,6 +939,48 @@
         }
 
         // Apply filters
+        // ---- Lines already picked in the bid (refreshed while the page is open) ----
+        let takenLines = new Set();
+        let takenLoaded = false;
+
+        async function loadTakenLines() {
+            try {
+                const path = (typeof BidYearIntegration !== 'undefined')
+                    ? BidYearIntegration.getFirebaseDataPath('all')
+                    : '/bid.json';
+                const r = await fetch(`${BID_CONFIG.getFirebaseUrl()}${path}`, { cache: 'no-store' });
+                const data = r.ok ? await r.json() : null;
+                const a = (data && data.assignments) || {};
+                takenLines = new Set(Object.values(a).filter(Boolean).map(String));
+                takenLoaded = true;
+            } catch (e) {
+                console.warn('[YearTimeline] Could not load bid picks:', e);
+            }
+            updateOpenCounts();
+        }
+
+        function isLineTaken(lineKey) {
+            return takenLines.has(String(lineKey));
+        }
+
+        function updateOpenCounts() {
+            const lines = window.ANNUAL_BID || [];
+            const open = { SSOM: 0, SOM: 0 };
+            lines.forEach(l => {
+                if (open[l.lineDesc] !== undefined && !isLineTaken(l.lineNbr)) open[l.lineDesc]++;
+            });
+            const s = document.getElementById('optSsomOpen');
+            const m = document.getElementById('optSomOpen');
+            if (s) s.textContent = `SSOM Lines Not Bid Yet${takenLoaded ? ' (' + open.SSOM + ')' : ''}`;
+            if (m) m.textContent = `SOM Lines Not Bid Yet${takenLoaded ? ' (' + open.SOM + ')' : ''}`;
+        }
+
+        async function refreshTakenLines() {
+            await loadTakenLines();
+            const f = document.getElementById('lineFilter').value;
+            if (f === 'ssom-open' || f === 'som-open') applyFilters();
+        }
+
         function applyFilters() {
             const filter = document.getElementById('lineFilter').value;
             const rows = document.querySelectorAll('tbody tr');
@@ -944,10 +988,17 @@
             rows.forEach(row => {
                 const lineType = row.getAttribute('data-type');
                 const isFavorite = row.getAttribute('data-favorite') === 'true';
+                const lineKey = row.getAttribute('data-line');
 
                 let show = true;
 
                 switch (filter) {
+                    case 'ssom-open':
+                        show = lineType === 'SSOM' && !isLineTaken(lineKey);
+                        break;
+                    case 'som-open':
+                        show = lineType === 'SOM' && !isLineTaken(lineKey);
+                        break;
                     case 'favorites':
                         show = isFavorite;
                         break;
@@ -1079,6 +1130,14 @@
                 // Generate UI
                 generateMonthNav();
                 generateTimeline();
+
+                // Which lines are already picked; refresh every 60 seconds so
+                // picked lines drop off the "Not Bid Yet" views as the bid goes on
+                await loadTakenLines();
+                setInterval(refreshTakenLines, 60000);
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden) refreshTakenLines();
+                });
 
                 // Update title with bid year
                 document.querySelector('h1').textContent = `Year Timeline - ${BID_CONFIG.getDisplayTitle()}`;
