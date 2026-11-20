@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How to Use the Pre-Bid - Help Guide</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; background: #f4f6fb; color: #1f2937;
+        font-family: "Segoe UI", Arial, sans-serif; font-size: 17px; line-height: 1.6;
+    }
+    .top {
+        background: linear-gradient(135deg, #16213e, #0f3460); color: #fff;
+        padding: 28px 20px 22px; text-align: center;
+    }
+    .top h1 { margin: 0 0 6px; font-size: 30px; }
+    .top p { margin: 0; color: #c7d2fe; }
+    .top a.back {
+        display: inline-block; margin-top: 14px; padding: 8px 18px; border-radius: 6px;
+        background: #4ecca3; color: #16213e; font-weight: bold; text-decoration: none;
+    }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .toc {
+        background: #fff; border-radius: 10px; padding: 16px 22px; margin-bottom: 22px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .toc h2 { margin: 0 0 8px; font-size: 20px; color: #0f3460; }
+    .toc ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 30px; }
+    .toc a { color: #2563eb; text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    section {
+        background: #fff; border-radius: 10px; padding: 20px 24px; margin-bottom: 18px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08); scroll-margin-top: 12px;
+    }
+    section h2 { margin: 0 0 10px; font-size: 23px; color: #0f3460; }
+    section h3 { margin: 16px 0 6px; font-size: 18px; color: #374151; }
+    .steps { counter-reset: s; list-style: none; padding: 0; margin: 10px 0; }
+    .steps li { counter-increment: s; position: relative; padding: 6px 0 6px 44px; }
+    .steps li::before {
+        content: counter(s); position: absolute; left: 0; top: 6px;
+        width: 30px; height: 30px; border-radius: 50%; background: #2563eb; color: #fff;
+        font-weight: bold; text-align: center; line-height: 30px; font-size: 15px;
+    }
+    .tip, .note, .warn { border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+    .tip  { background: #ecfdf5; border-left: 5px solid #10b981; }
+    .note { background: #eff6ff; border-left: 5px solid #3b82f6; }
+    .warn { background: #fffbeb; border-left: 5px solid #f59e0b; }
+    .btnlook {
+        display: inline-block; padding: 1px 9px; border-radius: 5px; font-size: 14px;
+        font-weight: bold; color: #fff; background: #475569; white-space: nowrap;
+    }
+    .b-life { background: #db2777; } .b-fav { background: #9d174d; } .b-time { background: #047857; }
+    .b-hol { background: #065f46; } .b-cmp { background: #7c3aed; } .b-edit { background: #6d28d9; }
+    .b-red { background: #c53030; } .b-purple { background: #9b59b6; } .b-green { background: #4ecca3; color: #16213e; }
+    /* mini example of a line row */
+    .demo { background: #1a1a2e; border-radius: 8px; padding: 10px; overflow-x: auto; margin: 10px 0; }
+    .demo-row { display: grid; grid-template-columns: 36px 22px 56px 64px repeat(12, 1fr); gap: 3px; align-items: center; min-width: 760px; }
+    .demo-head { color: #4ecca3; font-size: 12px; font-weight: bold; margin-bottom: 4px; text-align: center; }
+    .demo-cell { border-radius: 4px; text-align: center; font-size: 11px; padding: 3px 0; font-family: Consolas, monospace; }
+    .on  { background: #ffbf00; color: #000; } .off { background: #22e322; color: #000; }
+    .nbr { color: #4ecca3; font-weight: bold; text-align: center; line-height: 1.1; }
+    .nbr small { display: block; font-size: 10px; font-weight: normal; }
+    .wd-u { color: #f0c419; } .wd-e { color: #4ecca3; } .wd-o { color: #5dade2; }
+    .desc { background: #ffbf00; color: #000; font-size: 12px; border-radius: 4px; text-align: center; padding: 3px 0; }
+    .bidder { color: #888; font-style: italic; font-size: 12px; }
+    .labels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
+    .labels div { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; font-size: 15px; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 16px; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f3f4f6; }
+    code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 15px; }
+    .totop { display: block; text-align: right; font-size: 14px; margin-top: 8px; }
+    .totop a { color: #6b7280; text-decoration: none; }
+    @media (max-width: 700px) { .toc ol { columns: 1; } .labels { grid-template-columns: 1fr; } }
+    @media print {
+        body { background: #fff; font-size: 13px; }
+        .top a.back, .totop { display: none; }
+        section, .toc { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+    }
+</style>
+</head>
+<body>
+
+<div class="top" id="top">
+    <h1>&#10067; How to Use the Pre-Bid</h1>
+    <p>A simple, step-by-step guide for picking your line</p>
+    <a class="back" href="index.html">&larr; Back to the Bid</a>
+</div>
+
+<div class="wrap">
+
+<div class="toc">
+    <h2>What's in this guide</h2>
+    <ol>
+        <li><a href="#what">What is the Pre-Bid?</a></li>
+        <li><a href="#quick">The 5-minute version</a></li>
+        <li><a href="#screen">Reading the screen</a></li>
+        <li><a href="#codes">What the boxes mean</a></li>
+        <li><a href="#days">The small work-day numbers</a></li>
+        <li><a href="#calendar">See a line's whole year</a></li>
+        <li><a href="#life">Build My Life (find your best lines)</a></li>
+        <li><a href="#favorites">Favorites</a></li>
+        <li><a href="#holidays">Holidays</a></li>
+        <li><a href="#tools">More helpful tools</a></li>
+        <li><a href="#turn">When it's your turn</a></li>
+        <li><a href="#help">If something looks wrong</a></li>
+        <li><a href="#words">Words to know</a></li>
+    </ol>
+</div>
+
+<!-- 1 -->
+<section id="what">
+    <h2>1. What is the Pre-Bid?</h2>
+    <p>Each year, everyone picks a <b>line</b>. A line is your work schedule for the whole year.</p>
+    <p>People pick in <b>seniority order</b>. The person with the most seniority picks first. Then the next person picks, and so on.</p>
+    <p>This website lets you <b>look at every line</b> before it's your turn. You can see which days you work, which days you're off, and which holidays you get off.</p>
+    <div class="note"><b>Good to know:</b> You can't break anything by clicking around. Looking at lines does <b>not</b> pick a line. Only the bid admin can put a name on a line.</div>
+</section>
+
+<!-- 2 -->
+<section id="quick">
+    <h2>2. The 5-minute version</h2>
+    <ol class="steps">
+        <li>Open the bid page in <b>Google Chrome</b>.</li>
+        <li>Click <span class="btnlook b-red">&#9200; View Official Bid Times</span> to see <b>when</b> it's your turn.</li>
+        <li>Click <span class="btnlook b-life">&#128157; Build My Life</span>. Add the dates you need off. Click <b>Find My Perfect Lines</b>.</li>
+        <li>Click a line's <b>Desc</b> box (like <b>SOM</b>) to see its full year calendar.</li>
+        <li>Click the <b>&#9733; star</b> on lines you like. They go in your <span class="btnlook b-fav">&#11088; Favorites</span>.</li>
+        <li>Pick a few choices, from your favorite down. Lines get taken, so have backups!</li>
+        <li>When it's your turn, give your choice to the bid admin. Your name will show up next to that line.</li>
+    </ol>
+</section>
+
+<!-- 3 -->
+<section id="screen">
+    <h2>3. Reading the screen</h2>
+    <h3>The top</h3>
+    <p>The top bar counts lines for <b>SSOM</b> and <b>SOM</b>:</p>
+    <ul>
+        <li><b>Taken</b> = lines someone already picked.</li>
+        <li><b>Avail</b> = lines still open.</li>
+    </ul>
+    <p>On the right you'll see a small dot and a word like <b>Loaded</b>. That means the page is up to date. The page updates by itself every 5 minutes. Click <span class="btnlook b-green">&#10227; Refresh</span> to update it right now.</p>
+
+    <h3>The left side: Seniority List</h3>
+    <p>This shows everyone in pick order, with the line each person picked. Find your name to see your place in line.</p>
+
+    <h3>The right side: All Lines</h3>
+    <p>Every line is one row. Here's what one row looks like:</p>
+    <div class="demo">
+        <div class="demo-row demo-head">
+            <span>Line</span><span>&#11088;</span><span>Desc</span><span>Bidder</span>
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+        </div>
+        <div class="demo-row">
+            <div class="nbr">14<small class="wd-o">153</small></div>
+            <div style="color:#666; text-align:center;">&#9733;</div>
+            <div class="desc">SOM</div>
+            <div class="bidder">Available</div>
+            <div class="demo-cell on">P12ATL</div><div class="demo-cell on">P12ATL</div><div class="demo-cell off">--</div><div class="demo-cell off">--</div>
+            <div class="demo-cell on">A06N</div><div class="demo-cell on">A06N</div><div class="demo-cell on">A06N</div><div class="demo-cell off">--</div>
+            <div class="demo-cell off">--</div><div class="demo-cell off">--</div><div class="demo-cell on">P13DVT</div><div class="demo-cell off">--</div>
+        </div>
+    </div>
+    <div class="labels">
+        <div><b>Line</b><br>The line number. The small number under it is the line's <a href="#days">work days</a>.</div>
+        <div><b>&#9733; Star</b><br>Click it to save the line to your Favorites.</div>
+        <div><b>Desc</b><br>Click it to see the line's whole year on a calendar.</div>
+        <div><b>Bidder</b><br>Says <i>Available</i>, or the name of who picked it. A &#128274; lock means it's final.</div>
+        <div style="grid-column: span 2;"><b>Boxes 1 to 12</b><br>Your 12-day pattern. It repeats over and over all year long. <b>--</b> means a day off. The other boxes are work days.</div>
+    </div>
+    <p>The little red words above boxes 1 to 12 (like <b>THX</b> or <b>XMAS</b>) show which pattern day each holiday lands on. If a line has <b>--</b> under a holiday, that line gets that holiday off.</p>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 4 -->
+<section id="codes">
+    <h2>4. What the boxes mean</h2>
+    <p>A work box looks like <code>A06N</code>. It has two parts:</p>
+    <table>
+        <tr><th>Part</th><th>Example</th><th>What it means</th></tr>
+        <tr><td>Letter + 2 numbers</td><td><code>A06</code>N</td><td>Your <b>start time</b>. The numbers are the hour. Shifts are 12 hours.</td></tr>
+        <tr><td>The letters at the end</td><td>A06<code>N</code></td><td>Your <b>desk</b> (where you sit and what you work).</td></tr>
+    </table>
+    <h3>Start times</h3>
+    <table>
+        <tr><th>Code starts with</th><th>Shift</th></tr>
+        <tr><td><code>E05</code></td><td>5:00 AM to 5:00 PM</td></tr>
+        <tr><td><code>A06</code></td><td>6:00 AM to 6:00 PM</td></tr>
+        <tr><td><code>A09</code></td><td>9:00 AM to 9:00 PM</td></tr>
+        <tr><td><code>A10</code></td><td>10:00 AM to 10:00 PM</td></tr>
+        <tr><td><code>P12</code></td><td>12:00 noon to midnight</td></tr>
+        <tr><td><code>P13</code></td><td>1:00 PM to 1:00 AM</td></tr>
+        <tr><td><code>M18</code></td><td>6:00 PM to 6:00 AM (overnight)</td></tr>
+    </table>
+    <h3>Other boxes</h3>
+    <table>
+        <tr><th>Box</th><th>What it means</th></tr>
+        <tr><td><code>--</code></td><td>Day off.</td></tr>
+        <tr><td><code>XX</code> or <code>XXX</code></td><td>Relief day. You still work that day.</td></tr>
+    </table>
+    <div class="tip"><b>What does each desk letter mean?</b> Click the <span class="btnlook">Legend</span> button at the top. It lists every desk letter (like <b>N</b> = 321NEO, <b>ATL</b> = ATL ACC office, <b>DVT</b> = Diversion Desk). It also shows which holidays fall on which pattern day.</div>
+    <div class="note"><b>Seasonal desk:</b> <b>DVT</b> is only open part of the year. Outside its season, those days turn into relief days. The Legend shows the season dates. The year calendar shows it day by day.</div>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 5 -->
+<section id="days">
+    <h2>5. The small work-day numbers</h2>
+    <p>Under each line number is a tiny number. It's how many days that line works in the whole year. Our contract says <b>152 days</b>.</p>
+    <table>
+        <tr><th>Color</th><th>Means</th></tr>
+        <tr><td><b class="wd-u" style="background:#1a1a2e; padding:2px 8px; border-radius:4px;">151</b> Yellow</td><td>Less than 152 days</td></tr>
+        <tr><td><b class="wd-e" style="background:#1a1a2e; padding:2px 8px; border-radius:4px;">152</b> Green</td><td>Exactly 152 days</td></tr>
+        <tr><td><b class="wd-o" style="background:#1a1a2e; padding:2px 8px; border-radius:4px;">153</b> Blue</td><td>More than 152 days</td></tr>
+    </table>
+    <p><b>Point your mouse</b> at the small number to see a bigger box with the details, like "153 work days, Contract: 152 days, Difference: +1 day".</p>
+    <div class="note">Some years have an extra day (a leap year), so some lines come out at 153. The company may balance this later. If that happens, these numbers update by themselves.</div>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 6 -->
+<section id="calendar">
+    <h2>6. See a line's whole year</h2>
+    <ol class="steps">
+        <li>Find a line you like.</li>
+        <li>Click its <b>Desc</b> box (the colored box that says <b>SOM</b> or <b>SSOM</b>).</li>
+        <li>A calendar opens with every day of the bid year. The top also shows the line's work days.</li>
+    </ol>
+    <h3>Buttons on the calendar</h3>
+    <table>
+        <tr><th>Button</th><th>What it does</th></tr>
+        <tr><td>&#128197; Toggle View</td><td>Switches between two calendar styles. Pick the one that's easier for you.</td></tr>
+        <tr><td>&#128279; Copy Link</td><td>Copies a link to this calendar so you can send it to someone, like your family.</td></tr>
+        <tr><td>&#128229; Export ICS</td><td>Downloads the line so you can add it to Outlook or your phone's calendar.</td></tr>
+        <tr><td>&#9999;&#65039; YOUR EDIT</td><td>Opens the line in an editor where you can plan swaps, PTO, and more. See <a href="#tools">More helpful tools</a>.</td></tr>
+        <tr><td>&#128424;&#65039; Print</td><td>Prints the calendar.</td></tr>
+    </table>
+    <h3>Colors on the calendar</h3>
+    <ul>
+        <li><b style="color:#e94560;">Red outline</b> = a holiday.</li>
+        <li><b style="color:#fff; background:#FF0000; padding:0 6px; border-radius:3px;">Solid red</b> = a balance change. That day was changed from the normal pattern.</li>
+    </ul>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 7 -->
+<section id="life">
+    <h2>7. Build My Life (find your best lines)</h2>
+    <p>This is the best tool for finding a line that fits <b>your</b> life. You tell it the days you need off. It tells you which lines give you those days off.</p>
+    <ol class="steps">
+        <li>Click <span class="btnlook b-life">&#128157; Build My Life</span> at the top.</li>
+        <li><b>One day:</b> Pick the date. Type what it is (like "Son's graduation"). Choose <b>Must Have Off</b> or <b>Prefer Off</b>. Click <b>+ Add</b>.</li>
+        <li><b>Many days in a row</b> (like a vacation): Use <b>Add Date Range</b>. Pick a start and end date, type what it is, then click <b>+ Add Range</b>.</li>
+        <li>Add all your important dates.</li>
+        <li>Click <b>&#128269; Find My Perfect Lines</b>.</li>
+        <li>You'll see a list of lines with a score. Lines at the top fit your dates best.</li>
+    </ol>
+    <p>Two checkboxes help you sort the results:</p>
+    <ul>
+        <li><b>Show only perfect matches</b> = only lines that give you <b>every</b> date off.</li>
+        <li><b>Favorites first</b> = puts your starred lines at the top.</li>
+    </ul>
+    <div class="warn"><b>Important: your dates are private and stay on this computer.</b> No one else can see them, not even the bid admin. But if you switch computers or clear your browser, they're gone. Click <b>&#128229; Save</b> to download your dates as a file. On another computer, click <b>&#128228; Load</b> to bring them back.</div>
+    <div class="tip"><b>Tip:</b> Use <b>Must Have Off</b> only for days you truly can't work. Use <b>Prefer Off</b> for "nice to have" days. This gives you better results.</div>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 8 -->
+<section id="favorites">
+    <h2>8. Favorites</h2>
+    <ol class="steps">
+        <li>Click the <b>&#9733; star</b> next to any line you like. It turns gold.</li>
+        <li>The <span class="btnlook b-fav">&#11088; Favorites (3)</span> button counts how many you've starred.</li>
+        <li>Click the <b>Favorites</b> button to show <b>only</b> your starred lines. Click it again to see all lines.</li>
+    </ol>
+    <div class="tip"><b>Tip:</b> Star more lines than you need. If someone ahead of you takes your top pick, you'll have backups ready.</div>
+    <div class="note">Like Build My Life, your favorites are saved only on this computer.</div>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 9 -->
+<section id="holidays">
+    <h2>9. Holidays</h2>
+    <p>Click <span class="btnlook b-hol">&#127876; Holidays</span> to see a chart of <b>which lines get each holiday off</b>.</p>
+    <p>This is great if a certain holiday matters a lot to you, like Thanksgiving or Christmas.</p>
+    <div class="note">Holidays move to a different pattern day each year, so check every year. For example, some years have no Easter in the bid year at all.</div>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 10 -->
+<section id="tools">
+    <h2>10. More helpful tools</h2>
+    <table>
+        <tr><th>Button</th><th>What it does</th></tr>
+        <tr><td>&#128202; Line Summary</td><td>The bar just above the lines. Click it to see a quick count of the lines, like how many SSOM and SOM lines there are and how many have relief days.</td></tr>
+        <tr><td><span class="btnlook b-time">&#128197; Yearly Timelines</span></td><td>Shows <b>all lines for the whole year</b> on one big chart. Good for comparing lines side by side.</td></tr>
+        <tr><td><span class="btnlook b-cmp">&#128260; Compare</span></td><td>Finds lines that are good <b>swap partners</b> with each other, such as "5 On / 7 Off" and "2-Day Pickup" swaps. It follows the 8-hour rest rule.</td></tr>
+        <tr><td><span class="btnlook b-edit">&#9999;&#65039; Your Edit</span></td><td>Opens a line in an editor where you can plan your year. Add PTO, plan swaps, and download your plan. Changes here are <b>only for you</b>. They do <b>not</b> change your real bid.</td></tr>
+        <tr><td><span class="btnlook">&#128220; History</span></td><td>If someone's pick was changed during this bid, this shows the line they had before.</td></tr>
+        <tr><td><span class="btnlook">Legend</span></td><td>Explains desk letters, holidays, and symbols.</td></tr>
+        <tr><td><span class="btnlook b-red">&#9200; View Official Bid Times</span></td><td>Shows the date and time each person bids.</td></tr>
+        <tr><td><span class="btnlook b-purple">&#128274; Bid Confirmations</span></td><td>Shows which picks are final (confirmed).</td></tr>
+    </table>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 11 -->
+<section id="turn">
+    <h2>11. When it's your turn</h2>
+    <ol class="steps">
+        <li>Check <span class="btnlook b-red">&#9200; View Official Bid Times</span> to find your date and time. Each person gets a set number of minutes.</li>
+        <li>Before your time, look at the page again. Some of your favorite lines may be taken. Taken lines show the person's name instead of <i>Available</i>.</li>
+        <li>Have a list ready, from your first choice down to your last.</li>
+        <li>You may get a text that says it's your turn.</li>
+        <li>Give your choice to the bid admin.</li>
+        <li>Your name shows up next to your line. When it's final, you'll see a &#128274; lock.</li>
+    </ol>
+    <div class="warn"><b>If you see an orange "ESCALATION IN PROGRESS" bar at the top</b>, some lines are being handled in a special way. Read the message in the bar, and ask the bid admin if you have questions.</div>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 12 -->
+<section id="help">
+    <h2>12. If something looks wrong</h2>
+    <table>
+        <tr><th>Problem</th><th>Try this</th></tr>
+        <tr><td>The page looks strange or buttons don't work</td><td>Use <b>Google Chrome</b>. Then press <b>Ctrl + F5</b> to fully reload the page.</td></tr>
+        <tr><td>I don't see a line someone just picked</td><td>Click <span class="btnlook b-green">&#10227; Refresh</span> at the top right.</td></tr>
+        <tr><td>My Build My Life dates or favorites are gone</td><td>They're saved only on the computer where you made them. Use <b>Load</b> if you saved a file. Next time, click <b>Save</b>.</td></tr>
+        <tr><td>The calendar won't open</td><td>Click the colored <b>Desc</b> box (SOM or SSOM), not the line number.</td></tr>
+        <tr><td>I'm still stuck</td><td>Ask the bid admin.</td></tr>
+    </table>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<!-- 13 -->
+<section id="words">
+    <h2>13. Words to know</h2>
+    <table>
+        <tr><th>Word</th><th>Meaning</th></tr>
+        <tr><td><b>Line</b></td><td>A work schedule for the whole year.</td></tr>
+        <tr><td><b>Bid</b></td><td>Picking your line.</td></tr>
+        <tr><td><b>Bid year</b></td><td>The year your line covers: April 1 to March 31.</td></tr>
+        <tr><td><b>Seniority</b></td><td>Your place in line. Higher seniority picks first.</td></tr>
+        <tr><td><b>Pattern</b></td><td>The 12 boxes. Your work days and days off repeat every 12 days.</td></tr>
+        <tr><td><b>Desk</b></td><td>Where you sit and what you work. The letters at the end of a box.</td></tr>
+        <tr><td><b>SSOM / SOM</b></td><td>The two groups that bid. Each group picks from its own lines.</td></tr>
+        <tr><td><b>Relief day (XX)</b></td><td>A work day without a fixed desk in the pattern.</td></tr>
+        <tr><td><b>Swap</b></td><td>Trading work days with someone on another line.</td></tr>
+        <tr><td><b>Confirmed (&#128274;)</b></td><td>The pick is final.</td></tr>
+    </table>
+    <a class="totop" href="#top">Back to top &uarr;</a>
+</section>
+
+<p style="text-align:center; margin:24px 0 10px;"><a href="index.html" style="display:inline-block; padding:10px 22px; border-radius:6px; background:#16213e; color:#4ecca3; font-weight:bold; text-decoration:none;">&larr; Back to the Bid</a></p>
+</div>
+</body>
+</html>
