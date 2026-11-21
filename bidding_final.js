@@ -909,6 +909,10 @@
     function logout() {
         isAdmin = false;
         sessionStorage.removeItem('polish_bid_admin');
+        // Remove the admin bid-year controls so a regular user can't change years
+        if (typeof AdminYearSelector !== 'undefined' && AdminYearSelector.disable) {
+            AdminYearSelector.disable();
+        }
         document.getElementById('modeIndicator').textContent = 'VIEWER';
         document.getElementById('modeIndicator').className = 'mode-indicator viewer';
         document.getElementById('adminBtn').textContent = 'Admin Login';

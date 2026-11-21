@@ -415,8 +415,21 @@ const AdminYearSelector = (function() {
             </div>
         `;
 
+        yearSection.id = 'adminYearMenuSection';
         adminContent.appendChild(yearSection);
         renderQuickLinks('adminYearQuickLinks');
+    }
+
+    /**
+     * Turn the year controls off (called on admin logout): remove them from
+     * the page and refuse any further year changes until the next login.
+     */
+    function disable() {
+        isAdminAuthenticated = false;
+        ['adminYearSelector', 'adminYearMenuSection', 'adminYearQuickLinks'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        });
     }
 
     /**
@@ -476,6 +489,7 @@ const AdminYearSelector = (function() {
         copyYearLink,
         renderQuickLinks,
         addAdminMenuItems,
+        disable,
         isAuthenticated: () => isAdminAuthenticated
     };
 })();
