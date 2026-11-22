@@ -3535,6 +3535,37 @@ function isLineConfirmed(lineNbr) {
         const holidaysObj = window.HOLIDAYS || {};
         const patternMap = window.HOLIDAY_PATTERN_MAP || {};
 
+        // Build My Life dates for this bid year -> { 'Y-M-D': { p: 'must'|'prefer', l: 'label' } }
+        const myLifeMap = (function () {
+            const out = {};
+            const start = new Date(bidYear, 3, 1), end = new Date(bidYear + 1, 2, 31);
+            const put = (d, priority, label) => {
+                if (d < start || d > end) return;
+                const k = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                const cur = out[k];
+                if (!cur) { out[k] = { p: priority, l: label }; return; }
+                if (priority === 'must') cur.p = 'must';
+                if (label && cur.l.indexOf(label) === -1) cur.l += ' / ' + label;
+            };
+            const parse = s => { const a = String(s || '').split('-').map(Number); return a.length === 3 ? new Date(a[0], a[1] - 1, a[2]) : null; };
+            (typeof loadMyLifeDates === 'function' ? loadMyLifeDates() : []).forEach(item => {
+                const label = String(item.label || 'My Life date').slice(0, 80);
+                const pri = item.priority === 'prefer' ? 'prefer' : 'must';
+                if (item.type === 'range') {
+                    const a = parse(item.start), b = parse(item.end);
+                    if (!a || !b) return;
+                    for (let d = new Date(a); d <= b; d.setDate(d.getDate() + 1)) put(new Date(d), pri, label);
+                } else {
+                    const d = parse(item.date);
+                    if (d) put(d, pri, label);
+                }
+            });
+            return out;
+        })();
+        const myLifeCount = Object.keys(myLifeMap).length;
+        // Safe to embed in a <script>: no "<" can close the tag
+        const myLifeJSON = JSON.stringify(myLifeMap).replace(/</g, '\\u003c');
+
         // Dynamically collect all desks from pattern data, organized by time groups
         function collectAllDesks() {
             const deskSets = {
@@ -3782,6 +3813,18 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .work { background: #00FFFF; }
 .off { background: #00FF00; }
 .shift-cell { height: 22px; font-weight: bold; }
+/* Build My Life days: heart in the corner + pink ring (must = solid pink, prefer = light pink) */
+.shift-cell.mylife { position: relative; box-shadow: inset 0 0 0 2px #e91e63; }
+.shift-cell.mylife::after { content: "\\2665"; position: absolute; top: 0; right: 1px; font-size: 10px; line-height: 1; color: #e91e63; font-weight: normal; }
+.shift-cell.mylife.mylife-prefer { box-shadow: inset 0 0 0 2px #f48fb1; }
+.shift-cell.mylife.mylife-prefer::after { color: #f48fb1; }
+#myLifePanel { display: none; position: fixed; z-index: 20000; top: 70px; left: 50%; transform: translateX(-50%); background: #fff; color: #222; border: 2px solid #db2777; border-radius: 10px; padding: 16px 20px; width: 560px; max-width: 95vw; max-height: 80vh; overflow: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.4); font-family: Arial, sans-serif; font-size: 14px; }
+#myLifePanel h3 { margin: 0 0 8px; color: #db2777; }
+#myLifePanel table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
+#myLifePanel td, #myLifePanel th { border-bottom: 1px solid #eee; padding: 4px 6px; text-align: left; }
+#myLifePanel .row { margin: 8px 0; }
+#myLifePanel button { padding: 6px 14px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+@media print { #myLifePanel { display: none !important; } }
 .drag-palette { display: flex; gap: 8px; justify-content: flex-start; margin: 8px 0; padding: 8px 10px; background: #f0f0f0; border-radius: 8px; align-items: center; }
 .instructions { background: #e8f4fc; border: 1px solid #0066cc; border-radius: 8px; padding: 10px 15px; margin: 10px 0; font-size: 11px; color: #333; }
 .instructions b { color: #0066cc; }
@@ -3969,6 +4012,7 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
     <div class="tab-header no-print">
         <button onclick="printYearOverview()">Print Year Overview</button>
         <button id="colorToggleBtn" onclick="toggleColorScheme()" style="margin-left:15px; background:#666;">🎨 Subtle Colors</button>
+        <button id="myLifeBtn" onclick="addMyLifeDays()" style="margin-left:15px; background:#db2777;" ${myLifeCount ? '' : 'disabled title="No Build My Life dates in this bid year. Add them in Build My Life on the bid page first."'}>&#9829; Add My Life Dates (${myLifeCount})</button>
     </div>
     <div class="instructions no-print">
         <b>Edit cells:</b> Click any cell to type, or drag from palettes. Shifts prompt for Regular/SWAP/OT/DT.
@@ -4098,6 +4142,103 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
 </div>
 
 <script>
+// ---- Build My Life days (brought in from the bid page when this editor was opened) ----
+var MY_LIFE = ${myLifeJSON};
+var MY_LIFE_OFF = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
+var myLifeConflicts = [];
+
+function myLifeNice(dateStr) {
+    var p = dateStr.split('-').map(Number);
+    var d = new Date(p[0], p[1] - 1, p[2]);
+    return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+function myLifeEsc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function addMyLifeDays() {
+    var keys = Object.keys(MY_LIFE);
+    if (!keys.length) return;
+    saveToUndo();
+    var cells = document.querySelectorAll('.shift-cell[data-date]');
+    var offCount = 0;
+    myLifeConflicts = [];
+    for (var i = 0; i < cells.length; i++) {
+        var c = cells[i], k = c.getAttribute('data-date'), m = MY_LIFE[k];
+        if (!m) continue;
+        c.classList.add('mylife');
+        c.classList.toggle('mylife-prefer', m.p === 'prefer');
+        var val = c.textContent.trim().toUpperCase();
+        if (MY_LIFE_OFF.indexOf(val) !== -1) offCount++;
+        else myLifeConflicts.push({ cell: c, date: k, label: m.l, p: m.p, shift: val });
+    }
+    showMyLifePanel(offCount);
+}
+
+function showMyLifePanel(offCount) {
+    var panel = document.getElementById('myLifePanel');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'myLifePanel';
+        document.body.appendChild(panel);
+    }
+    var total = offCount + myLifeConflicts.length;
+    var html = '<h3>&#9829; My Life dates added</h3>' +
+        '<div class="row"><b>' + total + '</b> My Life ' + (total === 1 ? 'day' : 'days') + ' this bid year: ' +
+        '<b style="color:#16a34a;">' + offCount + ' already off</b>, ' +
+        '<b style="color:#dc2626;">' + myLifeConflicts.length + ' on work days</b>.</div>' +
+        '<div class="row" style="font-size:12px; color:#666;">Each My Life day now has a <span style="color:#e91e63;">&#9829;</span> (light pink = Prefer Off). Point at a day to see what it is. UNDO removes them.</div>';
+    if (myLifeConflicts.length) {
+        html += '<table><tr><th>Date</th><th>What</th><th>Shift</th></tr>';
+        myLifeConflicts.forEach(function (x) {
+            html += '<tr><td>' + myLifeNice(x.date) + '</td><td>' + myLifeEsc(x.label) + (x.p === 'prefer' ? ' <i style="color:#999;">(prefer)</i>' : '') + '</td><td>' + myLifeEsc(x.shift) + '</td></tr>';
+        });
+        html += '</table>' +
+            '<div class="row"><b>Fill these work days with:</b> ' +
+            '<select id="myLifeFillCode"><option value="VAC">VAC</option><option value="PPT">PPT</option><option value="HOL">HOL</option><option value="OFF">OFF</option><option value="SW-OFF">SWAP OFF</option><option value="COMP-OFF">COMP OFF</option></select> ' +
+            '<select id="myLifeFillWhich"><option value="all">all of them</option><option value="must">Must Have Off only</option></select></div>' +
+            '<div class="row"><button onclick="fillMyLifeConflicts()" style="background:#db2777; color:#fff;">Fill work days</button> ' +
+            '<button onclick="closeMyLifePanel()" style="background:#e5e7eb;">Just mark them</button></div>';
+    } else {
+        html += '<div class="row"><button onclick="closeMyLifePanel()" style="background:#db2777; color:#fff;">OK</button></div>';
+    }
+    panel.innerHTML = html;
+    panel.style.display = 'block';
+}
+
+function fillMyLifeConflicts() {
+    var code = document.getElementById('myLifeFillCode').value;
+    var which = document.getElementById('myLifeFillWhich').value;
+    saveToUndo();
+    var n = 0;
+    myLifeConflicts.forEach(function (x) {
+        if (which === 'must' && x.p !== 'must') return;
+        x.cell.textContent = code;
+        updateCellColor(x.cell);
+        n++;
+    });
+    closeMyLifePanel();
+    alert(n + ' work ' + (n === 1 ? 'day' : 'days') + ' filled with ' + code + '. Use UNDO to take it back.');
+}
+
+function closeMyLifePanel() {
+    var panel = document.getElementById('myLifePanel');
+    if (panel) panel.style.display = 'none';
+}
+
+// Hover a heart day to see what it is
+document.addEventListener('mouseover', function (e) {
+    var c = e.target.closest ? e.target.closest('.shift-cell[data-date]') : null;
+    if (!c) return;
+    var m = MY_LIFE[c.getAttribute('data-date')];
+    if (c.classList.contains('mylife') && m) {
+        c.title = String.fromCharCode(9829) + ' ' + m.l + (m.p === 'prefer' ? ' (Prefer Off)' : ' (Must Have Off)');
+    } else if (c.title && c.title.charCodeAt(0) === 9829) {
+        c.title = '';
+    }
+});
+
 // Undo/Redo history
 var undoStack = [];
 var redoStack = [];
