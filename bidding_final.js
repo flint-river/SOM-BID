@@ -3907,7 +3907,9 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
 <body>
 <div class="toolbar no-print">
     <button onclick="goBackToMain()" style="background:#6c757d; color:white; font-weight:bold;">&#8592; Back to Main Bid Page</button>
-    <button onclick="downloadAsHTML()" style="background:#28a745; color:white; font-weight:bold; margin-left:10px;">SAVE</button>
+    <button onclick="savePlan()" title="Download your plan as a file you can open again later (Ctrl+S)" style="background:#28a745; color:white; font-weight:bold; margin-left:10px;">💾 SAVE</button>
+    <button onclick="openPlanPicker()" title="Load a plan file you saved before" style="background:#2563eb; color:white; font-weight:bold; margin-left:6px;">📂 OPEN</button>
+    <input type="file" id="planFileInput" accept=".json,application/json" style="display:none" onchange="onPlanFileChosen(this)">
     <span style="margin-left:15px; border-left:2px solid #ccc; padding-left:15px; display:flex; align-items:center; gap:8px;">
         <label style="font-weight:bold; color:#333;">Switch Line:</label>
         <div class="line-dropdown" id="lineDropdown">
@@ -4018,7 +4020,7 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
         <b>Edit cells:</b> Click any cell to type, or drag from palettes. Shifts prompt for Regular/SWAP/OT/DT.
         <b>Receive shift:</b> Load a comparison line (orange), then drag THEIR shift to YOUR cell = auto-swap.
         <b>Give shift:</b> Click "Give Shift Mode" button, double-click YOUR cell (red border), click THEIR cell = you give it up.
-        <b>UNDO/REDO/RESET</b> for changes. <b>Ctrl+S</b> to download.
+        <b>UNDO/REDO/RESET</b> for changes. <b>SAVE</b> (or Ctrl+S) downloads your plan; <b>OPEN</b> loads it again.
         <br><b style="color:#e74c3c;">TIP - Quick Apply:</b> <b>Click</b> any shift/time-off in the palette below to select it, then <b>click</b> cells to apply repeatedly. <b>Shift+Click</b> for range fill!
     </div>
     <div id="quickApplyBar" class="no-print" style="display:none; background:#ffe4e1; border:2px solid #e74c3c; border-radius:6px; padding:10px 15px; margin:5px 0; font-size:12px;">
@@ -4026,7 +4028,7 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
         <b>Click</b> cell to apply. <b>Shift+Click</b> for range. <b>ESC</b> to exit.
     </div>
     <div class="no-print" style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:8px 12px; margin:5px 0; font-size:11px;">
-        <b>SAVE REMINDER:</b> Press <b>Ctrl+S</b> to save this file to your <b>Downloads</b> folder.
+        <b>SAVE REMINDER:</b> Click <b>💾 SAVE</b> (or Ctrl+S) to save your plan file to your <b>Downloads</b> folder. Use <b>📂 OPEN</b> to load it again later.
         <span style="color:#c0392b;"><b>VDI Users:</b></span> Downloads folder is cleared when you sign out!
         After saving, <b>move the file to your Desktop</b> or a network drive to keep it permanently.
     </div>
@@ -4264,7 +4266,7 @@ function captureState() {
     for (var p = 0; p < swapPartners.length; p++) {
         swaps[swapPartners[p].lineKey] = JSON.parse(JSON.stringify(swapPartners[p].swaps || {}));
     }
-    return { cells: result, swaps: swaps };
+    return { cells: result, swaps: swaps, active: activePartner ? activePartner.lineKey : null };
 }
 
 function restoreState(state) {
@@ -4278,9 +4280,22 @@ function restoreState(state) {
     }
     if (selectedMainCell) selectedMainCell = null;
     var saved = (state && state.swaps) || {};
+    // Bring back partners that were in the saved state (e.g. undoing an OPEN), keep any added since
+    for (var key in saved) {
+        var have = false;
+        for (var q = 0; q < swapPartners.length; q++) if (swapPartners[q].lineKey === key) have = true;
+        if (!have && typeof partnerFromKey === 'function') {
+            var np = partnerFromKey(key, {});
+            if (np) swapPartners.push(np);
+        }
+    }
     for (var p = 0; p < swapPartners.length; p++) {
         swapPartners[p].swaps = JSON.parse(JSON.stringify(saved[swapPartners[p].lineKey] || {}));
     }
+    if (state && state.active) {
+        for (var a = 0; a < swapPartners.length; a++) if (swapPartners[a].lineKey === state.active) activePartner = swapPartners[a];
+    }
+    if (activePartner && swapPartners.indexOf(activePartner) === -1) activePartner = null;
     refreshPartnerViews();
 }
 
@@ -5688,6 +5703,192 @@ document.addEventListener('mousedown', function(e) {
     updateCellColor(cell);
     lastQuickApplyCell = cell;
 }, true);
+
+// ---- Save / Open a plan file (JSON) ----
+var PLAN_APP = 'PolishBid-YourEdit';
+
+function planFileName() {
+    return 'YourEdit_Line' + CURRENT_LINE + '_' + CURRENT_BID_YEAR + '-' + (CURRENT_BID_YEAR + 1) + '.json';
+}
+
+function showPlanToast(msg, isError) {
+    var t = document.getElementById('planToast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'planToast';
+        t.style.cssText = 'position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:30000; padding:12px 20px; border-radius:8px; font:bold 14px Arial, sans-serif; box-shadow:0 6px 20px rgba(0,0,0,0.4); max-width:90vw;';
+        document.body.appendChild(t);
+    }
+    t.style.background = isError ? '#e74c3c' : '#16213e';
+    t.style.color = isError ? '#fff' : '#4ecca3';
+    t.style.border = '2px solid ' + (isError ? '#c0392b' : '#4ecca3');
+    t.textContent = msg;
+    t.style.display = 'block';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function () { t.style.display = 'none'; }, 6000);
+}
+
+function buildPlan() {
+    var all = document.querySelectorAll('.shift-cell');
+    var orig = originalState && originalState.cells ? originalState.cells : [];
+    var days = {}, marks = {};
+    for (var i = 0; i < all.length; i++) {
+        var c = all[i], d = c.getAttribute('data-date');
+        if (!d) continue;
+        var t = c.textContent.trim();
+        var o = orig[i] ? String(orig[i].text).trim() : null;
+        if (o === null || t !== o) days[d] = t;
+        if (c.classList.contains('mylife')) {
+            marks[d] = { p: c.classList.contains('mylife-prefer') ? 'prefer' : 'must', l: (MY_LIFE[d] && MY_LIFE[d].l) || 'My Life date' };
+        }
+    }
+    return {
+        app: PLAN_APP,
+        version: 1,
+        bidYear: CURRENT_BID_YEAR,
+        line: CURRENT_LINE,
+        savedAt: new Date().toISOString(),
+        days: days,
+        marks: marks,
+        partners: swapPartners.map(function (p) { return { lineKey: p.lineKey, swaps: JSON.parse(JSON.stringify(p.swaps || {})) }; }),
+        activePartner: activePartner ? activePartner.lineKey : null
+    };
+}
+
+function savePlan() {
+    var plan = buildPlan();
+    var blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = planFileName();
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    var n = Object.keys(plan.days).length, s = 0;
+    plan.partners.forEach(function (p) { s += Object.keys(p.swaps).length; });
+    showPlanToast('Saved ' + planFileName() + ' (' + n + ' changed ' + (n === 1 ? 'day' : 'days') + ', ' + s + ' ' + (s === 1 ? 'swap' : 'swaps') + '). Use OPEN to load it later.');
+}
+
+function openPlanPicker() {
+    document.getElementById('planFileInput').click();
+}
+
+function onPlanFileChosen(input) {
+    var f = input.files && input.files[0];
+    input.value = '';
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+        var plan;
+        try { plan = JSON.parse(r.result); } catch (e) { showPlanToast('That file is not a Your Edit plan.', true); return; }
+        loadPlan(plan);
+    };
+    r.readAsText(f);
+}
+
+function isPlan(plan) {
+    return plan && plan.app === PLAN_APP && typeof plan.line === 'string' && plan.days && typeof plan.days === 'object';
+}
+
+function loadPlan(plan) {
+    if (!isPlan(plan)) { showPlanToast('That file is not a Your Edit plan.', true); return; }
+    var y = Number(plan.bidYear);
+    if (y !== CURRENT_BID_YEAR) {
+        alert('That plan is for bid year ' + y + '-' + (y + 1) + '. This page is ' + CURRENT_BID_YEAR + '-' + (CURRENT_BID_YEAR + 1) + ', so the dates would not line up.');
+        return;
+    }
+    if (plan.line !== CURRENT_LINE) {
+        if (!allLinesData[plan.line]) { alert('That plan is for Line ' + plan.line + ', which is not in this bid year.'); return; }
+        if (!confirm('That plan is for Line ' + plan.line + '. You are on Line ' + CURRENT_LINE + '. Switch to Line ' + plan.line + ' and load it?')) return;
+        try { sessionStorage.setItem('yourEditPendingPlan', JSON.stringify(plan)); } catch (e) {}
+        selectLine(plan.line);
+        return;
+    }
+    applyPlan(plan);
+}
+
+function cleanSwaps(sw) {
+    var out = {};
+    if (!sw || typeof sw !== 'object') return out;
+    for (var d in sw) {
+        var r = sw[d];
+        if (r && (r.dir === 'give' || r.dir === 'receive') && typeof r.mainDate === 'string') {
+            out[d] = { dir: r.dir, mainDate: r.mainDate, mainBefore: String(r.mainBefore || '--').slice(0, 20), shift: String(r.shift || '').slice(0, 20) };
+        }
+    }
+    return out;
+}
+
+function partnerFromKey(lineKey, swaps) {
+    var info = allLinesData[lineKey];
+    if (!info) return null;
+    return { lineKey: lineKey, displayLabel: info.displayNum + '-' + info.lineDesc, displayNum: info.displayNum, data: { days: info.days }, swaps: cleanSwaps(swaps) };
+}
+
+function applyPlan(plan) {
+    saveToUndo();   // one UNDO takes the whole load back
+    var all = document.querySelectorAll('.shift-cell');
+    var orig = originalState && originalState.cells ? originalState.cells : [];
+    var seen = {}, nMarks = 0;
+    for (var i = 0; i < all.length; i++) {
+        var c = all[i], d = c.getAttribute('data-date');
+        if (orig[i]) { c.textContent = orig[i].text; c.className = orig[i].classes; }
+        if (!d) continue;
+        if (Object.prototype.hasOwnProperty.call(plan.days, d)) {
+            c.textContent = String(plan.days[d]).slice(0, 20);
+            updateCellColor(c);
+            seen[d] = true;
+        }
+        c.classList.remove('mylife', 'mylife-prefer');
+        var m = plan.marks && plan.marks[d];
+        if (m) {
+            c.classList.add('mylife');
+            if (m.p === 'prefer') c.classList.add('mylife-prefer');
+            if (!MY_LIFE[d]) MY_LIFE[d] = { p: m.p === 'prefer' ? 'prefer' : 'must', l: String(m.l || 'My Life date').slice(0, 80) };
+            nMarks++;
+        }
+    }
+    var skipped = Object.keys(plan.days).filter(function (k) { return !seen[k]; }).length;
+
+    swapPartners = [];
+    activePartner = null;
+    comparisonLineData = null;
+    clearComparisonLine();
+    var missing = 0, nSwaps = 0;
+    (plan.partners || []).forEach(function (pp) {
+        var p = partnerFromKey(pp.lineKey, pp.swaps);
+        if (p) { swapPartners.push(p); nSwaps += Object.keys(p.swaps).length; } else { missing++; }
+    });
+    var act = null;
+    for (var k = 0; k < swapPartners.length; k++) if (swapPartners[k].lineKey === plan.activePartner) act = swapPartners[k].lineKey;
+    if (!act && swapPartners.length) act = swapPartners[0].lineKey;
+    if (act) setActivePartner(act); else updatePartnersPanel();
+
+    var when = plan.savedAt ? new Date(plan.savedAt).toLocaleString() : 'unknown time';
+    var n = Object.keys(plan.days).length - skipped;
+    showPlanToast('Loaded plan saved ' + when + ': ' + n + ' changed ' + (n === 1 ? 'day' : 'days') + ', ' + swapPartners.length + ' ' + (swapPartners.length === 1 ? 'partner' : 'partners') + ', ' + nSwaps + ' ' + (nSwaps === 1 ? 'swap' : 'swaps') + (nMarks ? ', ' + nMarks + ' My Life ' + (nMarks === 1 ? 'day' : 'days') : '') + '. UNDO takes it back.' + (skipped || missing ? ' (' + (skipped + missing) + ' item(s) did not match this year and were skipped.)' : ''));
+}
+
+// Ctrl+S saves the plan file (instead of the browser's Save Page)
+document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key || '').toLowerCase() === 's') {
+        e.preventDefault();
+        savePlan();
+    }
+});
+
+// A plan waiting from the bid page or from a line switch
+window.addEventListener('DOMContentLoaded', function () {
+    var raw = null;
+    try { raw = sessionStorage.getItem('yourEditPendingPlan'); } catch (e) {}
+    if (!raw) return;
+    var plan = null;
+    try { plan = JSON.parse(raw); } catch (e) {}
+    if (plan && plan.line === CURRENT_LINE) {
+        try { sessionStorage.removeItem('yourEditPendingPlan'); } catch (e) {}
+        setTimeout(function () { loadPlan(plan); }, 0);
+    }
+});
 </script>
 </body>
 </html>`;
@@ -7643,6 +7844,35 @@ document.addEventListener('mousedown', function(e) {
         // Clear search input
         const searchInput = document.getElementById('lineSearchInput');
         if (searchInput) searchInput.value = '';
+    }
+
+    // Open a saved Your Edit plan file straight from the bid page
+    function openSavedPlanFromPicker(input) {
+        const f = input.files && input.files[0];
+        input.value = '';
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = function () {
+            let plan = null;
+            try { plan = JSON.parse(r.result); } catch (e) {}
+            if (!plan || plan.app !== 'PolishBid-YourEdit' || typeof plan.line !== 'string') {
+                alert('That file is not a Your Edit plan.');
+                return;
+            }
+            const y = BID_CONFIG.getBidYear();
+            if (Number(plan.bidYear) !== y) {
+                alert('That plan is for bid year ' + plan.bidYear + '-' + (Number(plan.bidYear) + 1) + '. The bid page is on ' + y + '-' + (y + 1) + '.');
+                return;
+            }
+            if (typeof ALL_LINES_CALENDAR === 'undefined' || !ALL_LINES_CALENDAR[plan.line]) {
+                alert('Line ' + plan.line + ' from that plan was not found in this bid year.');
+                return;
+            }
+            try { sessionStorage.setItem('yourEditPendingPlan', JSON.stringify(plan)); } catch (e) {}
+            hideYourEditPicker();
+            exportYearOverviewHTML(plan.line);
+        };
+        r.readAsText(f);
     }
 
     function selectAndLaunchYourEdit(lineNbr) {
@@ -10944,6 +11174,7 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.hideYourEditPicker = hideYourEditPicker;
     window.launchYourEdit = launchYourEdit;
     window.selectAndLaunchYourEdit = selectAndLaunchYourEdit;
+    window.openSavedPlanFromPicker = openSavedPlanFromPicker;
     window.filterLineCards = filterLineCards;
 
     // Change a desk's group assignment

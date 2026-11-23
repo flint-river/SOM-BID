@@ -617,6 +617,8 @@
             <h3>✏️ Your Edit - Line Selector</h3>
             <p style="color:#888; font-size:12px; margin-bottom:15px;">
                 Click a line card to open it in the Year Overview Editor.
+                <button onclick="document.getElementById('savedPlanInput').click()" style="margin-left:10px; padding:6px 14px; background:#2563eb; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">📂 Open Saved Plan</button>
+                <input type="file" id="savedPlanInput" accept=".json,application/json" style="display:none" onchange="openSavedPlanFromPicker(this)">
             </p>
 
             <!-- Search Filter -->
