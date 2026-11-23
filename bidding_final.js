@@ -2613,7 +2613,7 @@ function isLineConfirmed(lineNbr) {
     function renderExampleDiagram(category) {
         var html = '<div style="background:#1a1a2e; padding:15px; border-radius:8px; margin-bottom:20px;"><h4 style="color:#4ecca3; margin-bottom:10px; font-size:13px;">📖 How This Works</h4>';
         if (category === 'fiveSevenOff') {
-            html += '<div style="color:#eee; font-size:12px; line-height:1.6;"><p style="margin-bottom:10px;">Each person picks up the other\'s 2-day block to combine with their own 3-day block = 5 consecutive work days and 7 consecutive off.</p>' +
+            html += '<div style="color:#eee; font-size:12px; line-height:1.6;"><p style="margin-bottom:10px;">Each person picks up the other\'s 2-day block to combine with their own 3-day block = 5 consecutive work days and 7 consecutive off. <b style="color:#4ecca3;">Every ✓ pair can also do it the other way:</b> trade 3-day blocks instead (each picks up the other\'s 3 days next to their own 2), so each person works the other set of days. Auto-Swap in Your Edit offers both.</p>' +
                 '<div style="background:#0f3460; padding:12px; border-radius:6px; font-size:11px;"><div style="color:#e94560; font-weight:bold; margin-bottom:4px;">Example with Lines 1 & 2:</div>' +
                 '<div style="color:#888; margin-bottom:8px;">Line 1 original: Works 3,4,5 (3-day) and 9,10 (2-day) | Off 1,2,6,7,8,11,12<br>Line 2 original: Works 1,2 (2-day) and 6,7,8 (3-day) | Off 3,4,5,9,10,11,12</div>' +
                 '<div style="color:#4ecca3; font-weight:bold; margin-bottom:4px;">After Swap:</div>' +
@@ -6034,6 +6034,18 @@ function autoSwapOptions(myKey, theirKey) {
     var out = [];
     if (!mine || !theirs || mine.length !== 12 || theirs.length !== 12) return out;
     if (allLinesData[myKey].lineDesc !== allLinesData[theirKey].lineDesc) return out;
+    // 5 On / 7 Off by trading 3-day blocks: each picks up the other's 3 days next to their own 2 days
+    asBlocks(mine, 3).forEach(function (X) {
+        asBlocks(theirs, 3).forEach(function (Y) {
+            if (!Y.every(function (i) { return asIsOff(mine[i]); }) || !X.every(function (i) { return asIsOff(theirs[i]); })) return;
+            var nm = mine.slice(), nt = theirs.slice();
+            X.forEach(function (i) { nm[i] = '--'; nt[i] = mine[i]; });
+            Y.forEach(function (i) { nt[i] = '--'; nm[i] = theirs[i]; });
+            if (asSingleRun(nm, 5) && asSingleRun(nt, 5) && asCyclicRestOK(nm) && asCyclicRestOK(nt)) {
+                out.push({ type: '57-3', give: X, take: Y });
+            }
+        });
+    });
     asBlocks(mine, 2).forEach(function (X) {          // my 2-day block
         asBlocks(theirs, 2).forEach(function (Y) {    // their 2-day block
             var yOffMine = Y.every(function (i) { return asIsOff(mine[i]); });
@@ -6056,6 +6068,8 @@ function autoSwapOptions(myKey, theirKey) {
             }
         });
     });
+    var rank = { '57': 0, '57-3': 1, '2d': 2 };
+    out.sort(function (a, b) { return rank[a.type] - rank[b.type]; });
     return out;
 }
 
@@ -6089,7 +6103,7 @@ function buildAutoSwapPlan(opt, fromIdx, toIdx, meFirst, keepEven) {
     for (var k = 0; k < cycles; k++) {
         var s = k * 12;
         var takeIdx = [], giveIdx = [];
-        if (opt.type === '57') {
+        if (opt.type === '57' || opt.type === '57-3') {
             takeIdx = opt.take.map(function (p) { return s + p; });
             giveIdx = opt.give.map(function (p) { return s + p; });
         } else {
@@ -6182,7 +6196,7 @@ function openAutoSwap(preferType) {
     }
     if (!confirm(AUTO_SWAP_CAVEAT + ' Continue?')) return;
     var first = 0;
-    for (var i = 0; i < opts.length; i++) if (preferType && opts[i].type === preferType) { first = i; break; }
+    for (var i = 0; i < opts.length; i++) if (preferType && opts[i].type.indexOf(preferType) === 0) { first = i; break; }
     autoSwapState = { opts: opts, sel: first, meFirst: true, keepEven: true, fromIdx: 0, toIdx: asTotalDays() - 1 };
     renderAutoSwapPanel();
 }
@@ -6200,9 +6214,10 @@ function renderAutoSwapPanel() {
     h += '<div style="background:#fff3cd; border:1px solid #f0ad4e; border-radius:6px; padding:6px 10px; font-size:12px; margin-bottom:8px;"><b>Note:</b> ' + AUTO_SWAP_CAVEAT + '</div>';
     h += '<div style="font-weight:bold; margin:6px 0 4px;">1. Pick the swap</div>';
     st.opts.forEach(function (o, i) {
-        var name = o.type === '57' ? '5 On / 7 Off' : '2-Day Pickup';
-        var desc = o.type === '57'
-            ? 'Every cycle you work their days ' + o.take.map(function (x) { return x + 1; }).join(',') + ' and they work your days ' + o.give.map(function (x) { return x + 1; }).join(',') + '.'
+        var name = o.type === '57' ? '5 On / 7 Off (trade 2-day blocks)' : o.type === '57-3' ? '5 On / 7 Off (trade 3-day blocks)' : '2-Day Pickup';
+        var youWork = asWork(mine).filter(function (x) { return o.give.indexOf(x) === -1; }).concat(o.take).sort(function (a, b) { return a - b; });
+        var desc = o.type !== '2d'
+            ? 'Every cycle you work their days ' + o.take.map(function (x) { return x + 1; }).join(',') + ' and they work your days ' + o.give.map(function (x) { return x + 1; }).join(',') + '. You end up working days ' + youWork.map(function (x) { return x + 1; }).join(',') + '.'
             : 'Cycles take turns: one cycle you work all 4 days (' + o.give.concat(o.take).map(function (x) { return x + 1; }).join(',') + '), the next cycle they do.';
         h += '<label style="display:block; border:2px solid ' + (i === st.sel ? '#7c3aed' : '#ddd') + '; border-radius:8px; padding:6px 8px; margin-bottom:6px; cursor:pointer;">' +
             '<input type="radio" name="asOpt" ' + (i === st.sel ? 'checked' : '') + ' onchange="autoSwapState.sel=' + i + '; renderAutoSwapPanel();"> <b>' + name + '</b> <span style="font-size:12px; color:#555;">' + desc + '</span>' +
