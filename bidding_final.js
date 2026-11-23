@@ -3910,8 +3910,9 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .shift-cell.ppt { background: #9370DB !important; color: #fff; }
 .shift-cell.special { background: #FF4500 !important; color: #fff; }
 .shift-cell.training { background: #4169E1 !important; color: #fff; }
-.shift-cell.swap { background: #00CED1 !important; }
-.shift-cell.swapoff { background: #32CD32 !important; }
+/* Swapped days keep the normal colors (the SW- text marks the swap): SW-shift = work color, SW-OFF = off-day green */
+.shift-cell.swap { background: #00FFFF !important; }
+.shift-cell.swapoff { background: #00FF00 !important; }
 .shift-cell.compoff { background: #98FB98 !important; }
 .shift-cell.compwork { background: #FFA500 !important; }
 .shift-cell.ot { background: #FFA500 !important; }
@@ -3927,9 +3928,9 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .compare-row .compare-cell { cursor: grab; }
 .compare-row .compare-cell:hover { outline: 2px solid #9b59b6; }
 .compare-row .compare-cell.off-day { background: #ffd89b !important; color: #999; }
-/* Partner row swap days - solid colors with white bold text so they're easy to read */
-.compare-row td.compare-cell.cmp-got  { background: #0e7490 !important; color: #fff !important; font-weight: bold; }  /* you gave them your shift */
-.compare-row td.compare-cell.cmp-gave { background: #4b5563 !important; color: #fff !important; font-weight: bold; }  /* they gave their shift to you */
+/* Partner row stays all beige; the SW- text marks swapped days */
+.compare-row td.compare-cell.cmp-got  { background: #ffe4b5 !important; color: #000 !important; }  /* you gave them your shift */
+.compare-row td.compare-cell.cmp-gave { background: #ffe4b5 !important; color: #000 !important; }  /* they gave their shift to you */
 .shift-cell.holiday-cell { font-weight: bold !important; border: 3px solid #FF0000 !important; }
 .edit-btn { padding: 6px 12px; cursor: pointer; font-size: 11px; font-weight: bold; border: 1px solid #666; border-radius: 4px; background: #fff; margin-left: 5px; }
 .edit-btn:hover { background: #e0e0e0; }
@@ -3960,8 +3961,10 @@ body.subtle-colors .shift-cell.hol, body.subtle-colors .drag-item.hol { backgrou
 body.subtle-colors .shift-cell.ppt, body.subtle-colors .drag-item.ppt { background: #D8D0E8 !important; color: #333 !important; }
 body.subtle-colors .shift-cell.special, body.subtle-colors .drag-item.special { background: #F5D0C0 !important; color: #333 !important; }
 body.subtle-colors .shift-cell.training, body.subtle-colors .drag-item.training { background: #E0E0B0 !important; color: #333 !important; }
-body.subtle-colors .shift-cell.swap, body.subtle-colors .drag-item.swap { background: #D0E8F0 !important; }
-body.subtle-colors .shift-cell.swapoff, body.subtle-colors .drag-item.swapoff { background: #E8F0D0 !important; }
+body.subtle-colors .drag-item.swap { background: #D0E8F0 !important; }
+body.subtle-colors .drag-item.swapoff { background: #E8F0D0 !important; }
+body.subtle-colors .shift-cell.swap { background: #B8E0E0 !important; }
+body.subtle-colors .shift-cell.swapoff { background: #C8E8C8 !important; }
 body.subtle-colors .shift-cell.compoff, body.subtle-colors .drag-item.compoff { background: #F0E8D8 !important; }
 body.subtle-colors .shift-cell.compwork, body.subtle-colors .drag-item.compwork { background: #E0D8F0 !important; }
 body.subtle-colors .shift-cell.ot { background: #F8E8B0 !important; }
