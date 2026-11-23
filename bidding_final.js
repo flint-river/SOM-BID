@@ -6100,16 +6100,21 @@ function buildAutoSwapPlan(opt, fromIdx, toIdx, meFirst, keepEven) {
     var applied = [], skipped = [];
     var cycles = Math.ceil(total / 12);
     var twoDayTurn = 0;
+    // Map pattern days to real dates from an anchor so a block that wraps past
+    // day 12 stays on back-to-back dates (e.g. days 12,1 -> Apr 12, Apr 13).
+    function onDates(arr, anchor, s) { return arr.map(function (p) { return s + anchor + ((p - anchor + 12) % 12); }); }
+    // 2-Day Pickup: the 4-day run (their 2 + my 2) is one unit per cycle
+    var runStart = opt.type === '2d' ? asRuns(opt.give.concat(opt.take))[0][0] : 0;
     for (var k = 0; k < cycles; k++) {
         var s = k * 12;
         var takeIdx = [], giveIdx = [];
         if (opt.type === '57' || opt.type === '57-3') {
-            takeIdx = opt.take.map(function (p) { return s + p; });
-            giveIdx = opt.give.map(function (p) { return s + p; });
+            takeIdx = onDates(opt.take, opt.take[0], s);
+            giveIdx = onDates(opt.give, opt.give[0], s);
         } else {
             var iPickUp = (twoDayTurn % 2 === 0) === meFirst;
-            if (iPickUp) takeIdx = opt.take.map(function (p) { return s + p; });
-            else giveIdx = opt.give.map(function (p) { return s + p; });
+            if (iPickUp) takeIdx = onDates(opt.take, runStart, s);
+            else giveIdx = onDates(opt.give, runStart, s);
         }
         var idxs = takeIdx.concat(giveIdx);
         if (idxs.some(function (x) { return x < fromIdx || x > toIdx || x >= total; })) continue;   // outside range
@@ -6218,7 +6223,7 @@ function renderAutoSwapPanel() {
         var youWork = asWork(mine).filter(function (x) { return o.give.indexOf(x) === -1; }).concat(o.take).sort(function (a, b) { return a - b; });
         var desc = o.type !== '2d'
             ? 'Every cycle you work their days ' + o.take.map(function (x) { return x + 1; }).join(',') + ' and they work your days ' + o.give.map(function (x) { return x + 1; }).join(',') + '. You end up working days ' + youWork.map(function (x) { return x + 1; }).join(',') + '.'
-            : 'Cycles take turns: one cycle you work all 4 days (' + o.give.concat(o.take).map(function (x) { return x + 1; }).join(',') + '), the next cycle they do.';
+            : 'Your 2-day week and their 2-day week sit side by side. Cycles take turns: one cycle you work all 4 days (' + asRuns(o.give.concat(o.take))[0].map(function (x) { return x + 1; }).join(',') + ') and they are off, the next cycle they work all 4 and you are off.';
         h += '<label style="display:block; border:2px solid ' + (i === st.sel ? '#7c3aed' : '#ddd') + '; border-radius:8px; padding:6px 8px; margin-bottom:6px; cursor:pointer;">' +
             '<input type="radio" name="asOpt" ' + (i === st.sel ? 'checked' : '') + ' onchange="autoSwapState.sel=' + i + '; renderAutoSwapPanel();"> <b>' + name + '</b> <span style="font-size:12px; color:#555;">' + desc + '</span>' +
             '<div style="margin-top:4px; font-size:11px;">' + me + ' (you): red = days you give</div>' + asPatternStrip(mine, o.give, '#e11d48') +
