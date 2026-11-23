@@ -2303,11 +2303,19 @@ function isLineConfirmed(lineNbr) {
     let currentSwapCategory = 'fiveSevenOff';
     let swapAnalysisCache = null;
 
+    // Relief days (XX / XXX) have no set hours until they're bid out about a month ahead.
+    // Default relief shift: 09:00-21:00 (used by the rest rule here and by the ASCENT export).
+    var RELIEF_START_HOUR = 9;
+
+    function isReliefShift(code) {
+        return typeof code === 'string' && code.startsWith('XX');
+    }
+
     function getShiftStartHour(shiftCode) {
         if (!shiftCode || shiftCode === '--' || shiftCode === '-') return null;
+        if (isReliefShift(shiftCode)) return RELIEF_START_HOUR;
         const match = shiftCode.match(/[EAMP](\d{2})/);
         if (match) return parseInt(match[1]);
-        if (shiftCode.startsWith('XX')) return 6;
         return null;
     }
 
@@ -2317,6 +2325,8 @@ function isLineConfirmed(lineNbr) {
     }
 
     function has8HourRest(shiftCodeA, shiftCodeB) {
+        // X for X is a straight swap: both are relief until they're bid out, so no rest conflict
+        if (isReliefShift(shiftCodeA) && isReliefShift(shiftCodeB)) return true;
         const startA = getShiftStartHour(shiftCodeA);
         const startB = getShiftStartHour(shiftCodeB);
         if (startA === null || startB === null) return true;
@@ -2444,8 +2454,14 @@ function isLineConfirmed(lineNbr) {
         return max;
     }
 
+    function swapDataReady() {
+        return typeof ANNUAL_BID !== 'undefined' && ANNUAL_BID && ANNUAL_BID.length > 0 &&
+               typeof ALL_LINES_CALENDAR !== 'undefined' && ALL_LINES_CALENDAR && Object.keys(ALL_LINES_CALENDAR).length > 0;
+    }
+
     function analyzeSwapPairs() {
         if (swapAnalysisCache) return swapAnalysisCache;
+        if (!swapDataReady()) return { fiveSevenOff: { ssom: [], som: [] }, twoDayPickup: { ssom: [], som: [] } };   // never cache an empty result
         // Filter by lineDesc, not line number - there are overlapping numbers between SSOM and SOM
         const ssomLines = ANNUAL_BID.filter(l => l.lineDesc === 'SSOM');
         const somLines = ANNUAL_BID.filter(l => l.lineDesc === 'SOM');
@@ -2500,24 +2516,23 @@ function isLineConfirmed(lineNbr) {
                     twoBlocksB.forEach(blockB2 => {
                         // Check if blocks are adjacent (A then B, or B then A)
                         // Account for 12-day cycle wraparound
-                        const aEnd = Math.max(...blockA2.days);
-                        const aStart = Math.min(...blockA2.days);
-                        const bEnd = Math.max(...blockB2.days);
-                        const bStart = Math.min(...blockB2.days);
+                        // Use each block's own first/last day in pattern order. A block that wraps
+                        // around the cycle (days 12 and 1) starts at 11 and ends at 0, so min/max
+                        // can't be used here (that missed every pair involving a wrap-around block).
+                        const aStart = blockA2.days[0], aEnd = blockA2.days[blockA2.days.length - 1];
+                        const bStart = blockB2.days[0], bEnd = blockB2.days[blockB2.days.length - 1];
 
                         let combined = null;
                         let order = null;
 
-                        // A's block then B's block (A ends, B starts next day)
-                        // Include wraparound: day 11 followed by day 0
-                        if (bStart === aEnd + 1 || (aEnd === 11 && bStart === 0)) {
-                            combined = [...blockA2.days, ...blockB2.days].sort((a,b) => a - b);
+                        // A's block then B's block (B starts the day after A ends, cycle-aware)
+                        if (bStart === (aEnd + 1) % 12) {
+                            combined = [...blockA2.days, ...blockB2.days];
                             order = 'AB';
                         }
-                        // B's block then A's block (B ends, A starts next day)
-                        // Include wraparound: day 11 followed by day 0
-                        else if (aStart === bEnd + 1 || (bEnd === 11 && aStart === 0)) {
-                            combined = [...blockB2.days, ...blockA2.days].sort((a,b) => a - b);
+                        // B's block then A's block
+                        else if (aStart === (bEnd + 1) % 12) {
+                            combined = [...blockB2.days, ...blockA2.days];
                             order = 'BA';
                         }
 
@@ -2740,7 +2755,7 @@ function isLineConfirmed(lineNbr) {
         const calData = ALL_LINES_CALENDAR[lineNbr];
         const lineInfo = ANNUAL_BID.find(l => l.lineNbr === lineNbr);
         if (!calData || !lineInfo) {
-            alert(`Line ${lineNbr} data not found`);
+            alert(swapDataReady() ? `Line ${getDisplayNumber(lineNbr)} was not found in this bid year.` : 'Line patterns are still loading. Try again in a moment.');
             return;
         }
         linesData.push({
@@ -2767,7 +2782,7 @@ function isLineConfirmed(lineNbr) {
         { name: 'MARCH', year: bidYear + 1, month: 2 }
     ];
 
-    const titleParts = linesData.map(l => `Line ${l.nbr} (${l.desc})`).join(' vs ');
+    const titleParts = linesData.map(l => `Line ${getDisplayNumber(l.nbr)} (${l.desc})`).join(' vs ');
     let html = `<div style="text-align:center; color:#4ecca3; font-weight:bold; margin-bottom:10px; font-size:12px;">${titleParts} | April ${bidYear} - March ${bidYear + 1}</div>`;
     html += '<div class="manual-compare-container">';
 
@@ -2850,8 +2865,8 @@ function isLineConfirmed(lineNbr) {
     
     // Reset dropdown displays and text inputs
     const dropdowns = [
-        { id: 'A', placeholder: 'or Select' },
-        { id: 'B', placeholder: 'or Select' },
+        { id: 'A', placeholder: 'Select Line' },
+        { id: 'B', placeholder: 'Select Line' },
         { id: 'C', placeholder: '(optional)' },
         { id: 'D', placeholder: '(optional)' },
         { id: 'E', placeholder: '(optional)' }
@@ -2882,12 +2897,14 @@ function isLineConfirmed(lineNbr) {
     
     const titleParts = selectedLines.map(nbr => {
         const lineData = ANNUAL_BID.find(l => l.lineNbr === nbr);
-        return `Line ${nbr} (${lineData ? lineData.lineDesc : nbr})`;
+        return `Line ${getDisplayNumber(nbr)} (${lineData ? lineData.lineDesc : nbr})`;
     }).join(' vs ');
     
     const content = document.getElementById('manualCompareContent').innerHTML;
+    if (!content) { alert('Click Compare Lines first, then Print.'); return; }
 
-    const printWindow = window.open('', '_blank');
+    const printWindow = openPrintWindow();
+    if (!printWindow) return;
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -2965,20 +2982,21 @@ function isLineConfirmed(lineNbr) {
         lines.forEach(function(line) {
             var lineData = ANNUAL_BID.find(function(l) { return l.lineNbr === line; });
             var lineDesc = lineData ? lineData.lineDesc : line;
-            html += '<th style="position:sticky; top:0; z-index:20; padding:3px 2px; border:1px solid #333; background:#16213e; color:#4ecca3; font-weight:bold; writing-mode:vertical-rl; text-orientation:mixed; min-width:24px; max-width:24px; font-size:9px; line-height:1.1;">' + line + '<br>(' + lineDesc + ')</th>';
+            html += '<th title="Line ' + getDisplayNumber(line) + ' (' + lineDesc + ')" style="position:sticky; top:0; z-index:20; padding:3px 2px; border:1px solid #333; background:#16213e; color:#4ecca3; font-weight:bold; min-width:24px; max-width:24px; font-size:10px; line-height:1.1; text-align:center;">' + getDisplayNumber(line) + '</th>';
         });
         html += '</tr>';
         lines.forEach(function(lineA) {
             var lineDataA = ANNUAL_BID.find(function(l) { return l.lineNbr === lineA; });
             var lineDescA = lineDataA ? lineDataA.lineDesc : lineA;
-            html += '<tr><td style="position:sticky; left:0; z-index:10; padding:5px 8px; border:1px solid #333; background:#16213e; color:#4ecca3; font-weight:bold; white-space:nowrap; box-shadow:2px 0 5px rgba(0,0,0,0.3);">' + lineA + ' (' + lineDescA + ')</td>';
+            html += '<tr><td style="position:sticky; left:0; z-index:10; padding:5px 8px; border:1px solid #333; background:#16213e; color:#4ecca3; font-weight:bold; white-space:nowrap; box-shadow:2px 0 5px rgba(0,0,0,0.3);">Line ' + getDisplayNumber(lineA) + ' (' + lineDescA + ')</td>';
             lines.forEach(function(lineB) {
                 var isCompatible = matrix[lineA][lineB];
                 var isSameLine = lineA === lineB;
                 var bgColor = isSameLine ? '#0a0a0a' : (isCompatible ? '#2d5016' : '#1a1a2e');
                 var text = isSameLine ? '—' : (isCompatible ? '✓' : '');
                 var textColor = isCompatible ? '#4ecca3' : '#555';
-                html += '<td style="padding:4px 2px; border:1px solid #333; background:' + bgColor + '; color:' + textColor + '; text-align:center; font-weight:bold; font-size:13px; min-width:24px; max-width:24px;">' + text + '</td>';
+                var tip = isCompatible ? ' title="Line ' + getDisplayNumber(lineA) + ' and Line ' + getDisplayNumber(lineB) + ' can swap"' : '';
+                html += '<td' + tip + ' style="padding:4px 2px; border:1px solid #333; background:' + bgColor + '; color:' + textColor + '; text-align:center; font-weight:bold; font-size:13px; min-width:24px; max-width:24px;">' + text + '</td>';
             });
             html += '</tr>';
         });
@@ -2992,6 +3010,12 @@ function isLineConfirmed(lineNbr) {
             var btn = document.getElementById('btn-' + cat);
             if (btn) { btn.style.background = cat === category ? '#4ecca3' : '#0f3460'; btn.style.color = cat === category ? '#1a1a2e' : '#eee'; }
         });
+        if (!swapDataReady()) {
+            document.getElementById('swapCompareContent').innerHTML =
+                '<div style="color:#f0a500; font-size:13px; padding:20px; background:#0f3460; border-radius:6px; text-align:center;">⏳ Loading line patterns… this fills in by itself in a moment.</div>';
+            waitForSwapData();
+            return;
+        }
         var results = analyzeSwapPairs();
         var catRes = results[category];
         var html = renderExampleDiagram(category);
@@ -3006,12 +3030,41 @@ function isLineConfirmed(lineNbr) {
     }
 
     function showSwapCompare() { swapAnalysisCache = null; populateManualCompareDropdowns(); showSwapCategory('fiveSevenOff'); document.getElementById('swapCompareModal').classList.add('show'); }
+
+    // If Compare is opened before the line data has loaded, fill it in as soon as the data arrives
+    let swapDataTimer = null;
+    function waitForSwapData() {
+        if (swapDataTimer) return;
+        swapDataTimer = setInterval(function () {
+            const open = document.getElementById('swapCompareModal').classList.contains('show');
+            if (!open) { clearInterval(swapDataTimer); swapDataTimer = null; return; }
+            if (swapDataReady()) {
+                clearInterval(swapDataTimer); swapDataTimer = null;
+                swapAnalysisCache = null;
+                populateManualCompareDropdowns();
+                showSwapCategory(currentSwapCategory);
+            }
+        }, 400);
+    }
+    // New patterns loaded (upload or refresh): re-run the analysis next time it's shown
+    window.addEventListener('patternsLoaded', function () { swapAnalysisCache = null; });
+
+    // Print windows: tell the user if the browser blocked the pop-up (used to fail silently)
+    function openPrintWindow(features) {
+        const w = window.open('', '_blank', features || '');
+        if (!w) {
+            alert('Your browser blocked the print window. Allow pop-ups for this site, then click Print again.');
+            return null;
+        }
+        return w;
+    }
     function hideSwapCompare() { document.getElementById('swapCompareModal').classList.remove('show'); }
 
     function printSwapCompare() {
         const content = document.getElementById('swapCompareContent').innerHTML;
         const categoryTitle = currentSwapCategory === 'fiveSevenOff' ? '5 On / 7 Off Swaps' : '2-Day Pickup Swaps';
-        const printWindow = window.open('', '', 'width=800,height=600');
+        const printWindow = openPrintWindow('width=800,height=600');
+        if (!printWindow) return;
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -6358,7 +6411,10 @@ window.addEventListener('DOMContentLoaded', function () {
         if (!code || code === '--' || code === '-') return 'OFF';
         
         // Relief lines - use R format (placeholder)
-        if (code === 'XXX' || code === 'XX') return '0900R2100';
+        if (code === 'XXX' || code === 'XX') {
+            const pad = h => String(h % 24).padStart(2, '0');
+            return pad(RELIEF_START_HOUR) + '00R' + pad(RELIEF_START_HOUR + 12) + '00';   // 0900R2100
+        }
         
         // Parse the code: E05A, A06M, P12B, M18M, and multi-letter desks like P12ATL, P13DVT
         const match = code.match(/^([A-Z])(\d{2})([A-Z]+)$/);
