@@ -3951,7 +3951,7 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
             const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             const holidayClass = holidayName ? 'holiday' : '';
 
-            html += `<tr><td>${formattedDate}</td><td>${dayOfWeek}</td><td class="${cellClass}" contenteditable="true">${shift}</td><td class="${holidayClass}">${holidayName}</td></tr>\n`;
+            html += `<tr><td>${formattedDate}</td><td>${dayOfWeek}</td><td class="${cellClass} sched-shift" data-date="${dateStr}">${shift}</td><td class="${holidayClass}">${holidayName}</td></tr>\n`;
         });
 
         html += `</table>
@@ -3971,9 +3971,9 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
 
         <h3>Statistics</h3>
         <table class="summary-table">
-            <tr><td class="label">Work Days</td><td>${workDays}</td></tr>
-            <tr><td class="label">Off Days</td><td>${offDays}</td></tr>
-            <tr><td class="label">Holidays Off</td><td>${holidaysOff} of ${getHolidayTotal()}</td></tr>
+            <tr><td class="label">Work Days</td><td id="sumWorkDays">${workDays}</td></tr>
+            <tr><td class="label">Off Days</td><td id="sumOffDays">${offDays}</td></tr>
+            <tr><td class="label">Holidays Off</td><td id="sumHolOff" data-total="${getHolidayTotal()}">${holidaysOff} of ${getHolidayTotal()}</td></tr>
         </table>
 
         <h3>12-Day Pattern</h3>
@@ -3999,7 +3999,7 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
                 const dayData = calData.days[h.date];
                 const isOff = dayData && dayData.s === '--';
                 const statusClass = isOff ? 'off' : 'work';
-                html += `<tr><td>${h.name || abbrev}</td><td>${h.fullDate || h.date}</td><td class="${statusClass}">${isOff ? 'OFF' : 'WORK'}</td></tr>`;
+                html += `<tr><td>${h.name || abbrev}</td><td>${h.fullDate || h.date}</td><td class="${statusClass}" data-hdate="${h.date}">${isOff ? 'OFF' : 'WORK'}</td></tr>`;
             }
         });
 
@@ -4249,26 +4249,39 @@ window.addEventListener('DOMContentLoaded', function() {
     originalState = captureState();
 });
 
+// A saved state = every day on YOUR line + every swap recorded with each partner.
+// Undo/Redo/Reset restore both, so partner rows and the balance always match.
 function captureState() {
     var cells = document.querySelectorAll('.shift-cell');
     var result = [];
     for (var i = 0; i < cells.length; i++) {
         result.push({
             text: cells[i].textContent,
-            classes: cells[i].className
+            classes: cells[i].className.replace(/\\b(swap-selected|drag-over)\\b/g, '').replace(/\\s+/g, ' ').trim()
         });
     }
-    return result;
+    var swaps = {};
+    for (var p = 0; p < swapPartners.length; p++) {
+        swaps[swapPartners[p].lineKey] = JSON.parse(JSON.stringify(swapPartners[p].swaps || {}));
+    }
+    return { cells: result, swaps: swaps };
 }
 
 function restoreState(state) {
+    var cellStates = state && state.cells ? state.cells : state;
     var cells = document.querySelectorAll('.shift-cell');
     for (var i = 0; i < cells.length; i++) {
-        if (state[i]) {
-            cells[i].textContent = state[i].text;
-            cells[i].className = state[i].classes;
+        if (cellStates && cellStates[i]) {
+            cells[i].textContent = cellStates[i].text;
+            cells[i].className = cellStates[i].classes;
         }
     }
+    if (selectedMainCell) selectedMainCell = null;
+    var saved = (state && state.swaps) || {};
+    for (var p = 0; p < swapPartners.length; p++) {
+        swapPartners[p].swaps = JSON.parse(JSON.stringify(saved[swapPartners[p].lineKey] || {}));
+    }
+    refreshPartnerViews();
 }
 
 function saveToUndo() {
@@ -4339,7 +4352,42 @@ function resetToOriginal() {
     }
 }
 
+// Summary and Schedule tabs are rebuilt from the Year Overview, so they show your edits and swaps
+function syncSideTabs() {
+    var offLike = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
+    var byDate = {};
+    var cells = document.querySelectorAll('#yearview .shift-cell[data-date]');
+    var work = 0;
+    for (var i = 0; i < cells.length; i++) {
+        var t = cells[i].textContent.trim();
+        byDate[cells[i].getAttribute('data-date')] = t;
+        if (offLike.indexOf(t.toUpperCase()) === -1) work++;
+    }
+    var w = document.getElementById('sumWorkDays'), o = document.getElementById('sumOffDays'), h = document.getElementById('sumHolOff');
+    if (w) w.textContent = work;
+    if (o) o.textContent = cells.length - work;
+    var holOff = 0, hols = document.querySelectorAll('[data-hdate]');
+    for (var k = 0; k < hols.length; k++) {
+        var v = byDate[hols[k].getAttribute('data-hdate')];
+        var isOff = v === undefined ? hols[k].textContent.trim() === 'OFF' : offLike.indexOf(String(v).toUpperCase()) !== -1;
+        if (isOff) holOff++;
+        hols[k].textContent = isOff ? 'OFF' : 'WORK';
+        hols[k].className = isOff ? 'off' : 'work';
+    }
+    if (h) h.textContent = holOff + ' of ' + (h.getAttribute('data-total') || hols.length);
+    var sched = document.querySelectorAll('.sched-shift[data-date]');
+    for (var m = 0; m < sched.length; m++) {
+        var sv = byDate[sched[m].getAttribute('data-date')];
+        if (sv === undefined) continue;
+        sched[m].textContent = sv;
+        var off = offLike.indexOf(sv.toUpperCase()) !== -1;
+        sched[m].classList.toggle('off', off);
+        sched[m].classList.toggle('work', !off);
+    }
+}
+
 function showTab(tabId, btn) {
+    if (tabId === 'summary' || tabId === 'schedule') syncSideTabs();
     var tabs = document.querySelectorAll('.tab-content');
     for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('active'); }
     var btns = document.querySelectorAll('.tab-btn');
@@ -4353,6 +4401,7 @@ function showTab(tabId, btn) {
 }
 
 function printTab(tabId) {
+    syncSideTabs();
     // Mark the tab to print
     var tabs = document.querySelectorAll('.tab-content');
     for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('print-this'); }
@@ -4529,6 +4578,7 @@ function updateCellColor(cell) {
 }
 
 // Dynamic coloring for all editable shift cells
+var typingSnapshot = null;
 var editableCells = document.querySelectorAll('[contenteditable="true"]');
 for (var ec = 0; ec < editableCells.length; ec++) {
     (function(cell) {
@@ -4537,6 +4587,7 @@ for (var ec = 0; ec < editableCells.length; ec++) {
                 if (!this.dataset.editing) {
                     this.dataset.editing = 'true';
                     this.dataset.originalValue = this.textContent;
+                    typingSnapshot = captureState();
                 }
             });
 
@@ -4550,9 +4601,14 @@ for (var ec = 0; ec < editableCells.length; ec++) {
                     this.textContent = '--';
                 }
                 updateCellColor(this);
-                if (this.dataset.editing && this.dataset.originalValue !== this.textContent) {
-                    saveToUndo();
+                if (this.dataset.editing && this.dataset.originalValue !== this.textContent && typingSnapshot) {
+                    // Save the state from BEFORE the typing so one Undo puts the old value back
+                    undoStack.push(typingSnapshot);
+                    redoStack = [];
+                    if (undoStack.length > 50) undoStack.shift();
+                    updateUndoRedoCounts();
                 }
+                typingSnapshot = null;
                 delete this.dataset.editing;
                 delete this.dataset.originalValue;
             });
@@ -4590,6 +4646,7 @@ function showDeskPopup(targetCell) {
         deskBtns[j].addEventListener('click', function() {
             var desk = this.getAttribute('data-desk');
             document.body.removeChild(overlay);
+            saveToUndo();
             targetCell.textContent = 'CW-' + desk;
             updateCellColor(targetCell);
         });
@@ -4678,25 +4735,10 @@ function selectMainCellForSwap(cell) {
 
 function swapToComparisonCell(compareCell) {
     if (!selectedMainCell) return;
-
-    saveToUndo();
-
-    var mainShift = selectedMainCell.textContent.trim();
-
-    // Mark main cell as SWAP OFF (you're giving it up)
-    selectedMainCell.textContent = 'SW-OFF';
-    updateCellColor(selectedMainCell);
-    selectedMainCell.classList.remove('swap-selected');
-
-    // Show the swap on comparison cell (visual - they're receiving)
-    compareCell.textContent = 'SW-' + mainShift;
-    compareCell.style.background = '#27ae60';
-    compareCell.style.color = '#fff';
-
-    // Track this as giving a shift to partner
-    trackSwap('give');
-
+    var mainCell = selectedMainCell;
+    mainCell.classList.remove('swap-selected');
     selectedMainCell = null;
+    giveShiftToPartner(mainCell, compareCell);
 }
 
 var dragItems = document.querySelectorAll('.drag-item');
@@ -4761,6 +4803,16 @@ function stopQuickApply() {
     if (bar) bar.style.display = 'none';
 }
 
+// Ctrl+Z = UNDO, Ctrl+Y (or Ctrl+Shift+Z) = REDO, except while typing in a day
+document.addEventListener('keydown', function(e) {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    var a = document.activeElement;
+    if (a && a.isContentEditable) return;   // let the browser undo your typing
+    var k = (e.key || '').toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoChange(); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoChange(); }
+});
+
 // ESC to exit quick apply
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && quickApplyValue) {
@@ -4787,7 +4839,7 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
     // Make main cells draggable for swap planning
     shiftCells[sc].addEventListener('dragstart', function(e) {
         var cellText = this.textContent.trim();
-        if (cellText && cellText !== '--') {
+        if (cellText && cellText !== '--' && cellText !== 'SW-OFF') {
             draggedValue = cellText;
             draggedType = 'mainshift';  // From main line
             draggedSourceCell = this;
@@ -4802,6 +4854,7 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
         if (!swapMode) {
             this.setAttribute('contenteditable', 'true');
         }
+        clearDragState();
     });
 
     shiftCells[sc].addEventListener('dragover', function(e) {
@@ -4817,53 +4870,41 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
         e.preventDefault();
         this.classList.remove('drag-over');
         var targetCell = this;
-        if (draggedValue) {
-            saveToUndo();
+        if (!draggedValue) return;
+        var value = draggedValue, type = draggedType, source = draggedSourceCell;
+        clearDragState();
 
-            // If it's a shift (not time-off), ask about swap/OT/DT
-            if (draggedType === 'shift') {
-                var shiftChoice = prompt('Is this shift a:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
-
-                if (shiftChoice === '2') {
-                    targetCell.textContent = 'SW-' + draggedValue;
-                } else if (shiftChoice === '3') {
-                    targetCell.textContent = 'OT-' + draggedValue;
-                } else if (shiftChoice === '4') {
-                    targetCell.textContent = 'DT-' + draggedValue;
-                } else {
-                    targetCell.textContent = draggedValue;
-                }
-            } else if (draggedType === 'swap') {
-                // From comparison line - auto-apply as swap
-                targetCell.textContent = 'SW-' + draggedValue;
-                // Mark comparison source cell as SWAP OFF (they're giving it up)
-                if (draggedSourceCell) {
-                    draggedSourceCell.textContent = 'SW-OFF';
-                    draggedSourceCell.style.background = '#95a5a6';
-                    draggedSourceCell.style.color = '#fff';
-                }
-                // Track this as receiving a shift from partner
-                trackSwap('receive');
-            } else if (draggedType === 'compwork') {
-                // COMP WORK - show desk selection popup
-                showDeskPopup(targetCell);
-                return;
-            } else if (draggedType === 'special') {
-                // SPECIAL or TRAINING - ask COMP or OT
-                var prefix = draggedValue;
-                var specChoice = prompt(prefix + ' - Is this:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
-                if (specChoice === '1') {
-                    targetCell.textContent = 'C-' + prefix;
-                } else if (specChoice === '2') {
-                    targetCell.textContent = 'OT-' + prefix;
-                } else {
-                    targetCell.textContent = prefix;
-                }
-            } else {
-                targetCell.textContent = draggedValue;
-            }
-            updateCellColor(targetCell);
+        if (type === 'swap') {
+            // From the partner row: take their shift (or take back one you gave)
+            receiveShiftFromPartner(source, targetCell);
+            return;
         }
+        if (type === 'mainshift' && source === targetCell) return;   // dropped on itself
+        if (type === 'compwork') {
+            showDeskPopup(targetCell);   // undo point is saved when a desk is picked
+            return;
+        }
+
+        var newText = value;
+        if (type === 'shift') {
+            var shiftChoice = prompt('Is this shift a:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
+            if (shiftChoice === null) return;   // Cancel = no change
+            if (shiftChoice === '2') newText = 'SW-' + value;
+            else if (shiftChoice === '3') newText = 'OT-' + value;
+            else if (shiftChoice === '4') newText = 'DT-' + value;
+        } else if (type === 'special') {
+            var specChoice = prompt(value + ' - Is this:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
+            if (specChoice === null) return;    // Cancel = no change
+            if (specChoice === '1') newText = 'C-' + value;
+            else if (specChoice === '2') newText = 'OT-' + value;
+        }
+        if (findSwapForMainDate(targetCell.getAttribute('data-date'))) {
+            alert('This day is part of a swap. Undo the swap first (drag it back, or use UNDO).');
+            return;
+        }
+        saveToUndo();
+        targetCell.textContent = newText;
+        updateCellColor(targetCell);
     });
 }
 
@@ -5049,8 +5090,7 @@ function addSwapPartner() {
         displayLabel: displayLabel,
         displayNum: lineInfo.displayNum,
         data: { days: lineInfo.days },
-        give: 0,
-        receive: 0
+        swaps: {}      // partner date -> { dir: 'give'|'receive', mainDate, mainBefore, shift }
     };
     swapPartners.push(partner);
 
@@ -5082,6 +5122,11 @@ function setActivePartner(lineKey) {
 }
 
 function removeSwapPartner(lineKey) {
+    for (var k = 0; k < swapPartners.length; k++) {
+        if (swapPartners[k].lineKey === lineKey && Object.keys(swapPartners[k].swaps || {}).length) {
+            if (!confirm('Remove L' + swapPartners[k].displayNum + '? Your swaps with this line stay on your schedule, but they will no longer be tracked or counted.')) return;
+        }
+    }
     var filtered = [];
     for (var i = 0; i < swapPartners.length; i++) {
         if (swapPartners[i].lineKey !== lineKey) { filtered.push(swapPartners[i]); }
@@ -5114,12 +5159,15 @@ function updatePartnersPanel() {
 
     panel.style.display = 'block';
 
-    // Calculate totals
+    // Calculate totals (from the recorded swaps, so they can never drift)
     var totalGive = 0;
     var totalReceive = 0;
     for (var i = 0; i < swapPartners.length; i++) {
-        totalGive += swapPartners[i].give;
-        totalReceive += swapPartners[i].receive;
+        var cnt = partnerCounts(swapPartners[i]);
+        swapPartners[i].give = cnt.give;
+        swapPartners[i].receive = cnt.receive;
+        totalGive += cnt.give;
+        totalReceive += cnt.receive;
     }
     var netBalance = totalReceive - totalGive;
     var balanceColor = netBalance > 0 ? '#27ae60' : netBalance < 0 ? '#e74c3c' : '#888';
@@ -5148,20 +5196,144 @@ function updatePartnersPanel() {
     list.innerHTML = html;
 }
 
-function trackSwap(direction) {
-    // Called when a swap happens - direction is 'give' or 'receive'
-    if (!activePartner) return;
+function partnerCounts(p) {
+    var c = { give: 0, receive: 0 };
+    var sw = p.swaps || {};
+    for (var d in sw) { if (sw[d].dir === 'give') c.give++; else if (sw[d].dir === 'receive') c.receive++; }
+    return c;
+}
 
-    if (direction === 'give') {
-        activePartner.give++;
-    } else if (direction === 'receive') {
-        activePartner.receive++;
+// ---------- Swap engine: every swap is recorded so it can be undone or dragged back ----------
+var OFF_LIKE = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
+
+function clearDragState() {
+    draggedValue = null;
+    draggedType = null;
+    draggedSourceCell = null;
+}
+
+function niceDate(dateStr) {
+    var p = String(dateStr).split('-').map(Number);
+    var d = new Date(p[0], p[1] - 1, p[2]);
+    return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()] + ' ' + d.getDate();
+}
+
+function mainCellFor(dateStr) {
+    return document.querySelector('.shift-cell[data-date="' + dateStr + '"]');
+}
+
+// Which partner swap (if any) uses this day on YOUR line?
+function findSwapForMainDate(mainDate) {
+    for (var i = 0; i < swapPartners.length; i++) {
+        var sw = swapPartners[i].swaps || {};
+        for (var d in sw) {
+            if (sw[d].mainDate === mainDate) return { partner: swapPartners[i], partnerDate: d, rec: sw[d] };
+        }
     }
+    return null;
+}
 
+function baseShift(text) {
+    return String(text).replace(/^SW-/, '');
+}
+
+// Drag from the partner row onto YOUR row
+function receiveShiftFromPartner(compareCell, mainCell) {
+    if (!activePartner || !compareCell || !mainCell) return;
+    var pDate = compareCell.getAttribute('data-date');
+    var mDate = mainCell.getAttribute('data-date');
+    var rec = activePartner.swaps[pDate];
+
+    if (rec && rec.dir === 'give') {
+        // This is YOUR shift that you gave them - dragging it back undoes that swap
+        if (rec.mainDate !== mDate) {
+            alert('That is the shift you gave L' + activePartner.displayNum + ' from ' + niceDate(rec.mainDate) + '. Drag it back to ' + niceDate(rec.mainDate) + ' to undo the swap.');
+            return;
+        }
+        saveToUndo();
+        mainCell.textContent = rec.mainBefore;
+        updateCellColor(mainCell);
+        delete activePartner.swaps[pDate];
+        refreshPartnerViews();
+        return;
+    }
+    if (rec && rec.dir === 'receive') {
+        alert('You already took this shift (it is on your ' + niceDate(rec.mainDate) + ').');
+        return;
+    }
+    var shift = compareCell.getAttribute('data-value');
+    if (!shift || shift === '--') return;
+    var existing = findSwapForMainDate(mDate);
+    if (existing) {
+        alert(niceDate(mDate) + ' is already part of a swap with L' + existing.partner.displayNum + '. Undo that swap first.');
+        return;
+    }
+    var current = mainCell.textContent.trim();
+    if (pDate !== mDate && !confirm('Their shift is on ' + niceDate(pDate) + ' but you dropped it on ' + niceDate(mDate) + '. Swaps are usually the same day. Do it anyway?')) return;
+    if (OFF_LIKE.indexOf(current.toUpperCase()) === -1 && !confirm('You already work ' + current + ' on ' + niceDate(mDate) + '. Replace it with SW-' + shift + '?')) return;
+
+    saveToUndo();
+    activePartner.swaps[pDate] = { dir: 'receive', mainDate: mDate, mainBefore: current, shift: shift };
+    mainCell.textContent = 'SW-' + shift;
+    updateCellColor(mainCell);
+    refreshPartnerViews();
+}
+
+// Drag YOUR shift onto the partner row (or Give Shift Mode click)
+function giveShiftToPartner(mainCell, compareCell) {
+    if (!activePartner || !mainCell || !compareCell) return;
+    var pDate = compareCell.getAttribute('data-date');
+    var mDate = mainCell.getAttribute('data-date');
+    var current = mainCell.textContent.trim();
+    var mine = findSwapForMainDate(mDate);
+
+    if (mine && mine.rec.dir === 'receive') {
+        // A shift you took from a partner - dragging it back to them undoes that swap
+        if (mine.partner === activePartner && mine.partnerDate === pDate) {
+            saveToUndo();
+            mainCell.textContent = mine.rec.mainBefore;
+            updateCellColor(mainCell);
+            delete activePartner.swaps[pDate];
+            refreshPartnerViews();
+        } else {
+            alert('That shift came from L' + mine.partner.displayNum + ' on ' + niceDate(mine.partnerDate) + '. To undo it, show L' + mine.partner.displayNum + ' and drag it back to ' + niceDate(mine.partnerDate) + '.');
+        }
+        return;
+    }
+    if (mine) {
+        alert(niceDate(mDate) + ' is already part of a swap with L' + mine.partner.displayNum + '.');
+        return;
+    }
+    if (!current || current === '--' || current === 'SW-OFF') return;
+    if (activePartner.swaps[pDate]) {
+        alert(niceDate(pDate) + ' already has a swap with L' + activePartner.displayNum + '. Undo that one first.');
+        return;
+    }
+    if (pDate !== mDate && !confirm('You are giving your ' + niceDate(mDate) + ' shift onto their ' + niceDate(pDate) + '. Swaps are usually the same day. Do it anyway?')) return;
+    var theirs = compareCell.getAttribute('data-value') || '--';
+    if (theirs !== '--' && !confirm('L' + activePartner.displayNum + ' already works ' + theirs + ' on ' + niceDate(pDate) + '. Give them your shift anyway?')) return;
+
+    saveToUndo();
+    activePartner.swaps[pDate] = { dir: 'give', mainDate: mDate, mainBefore: current, shift: baseShift(current) };
+    mainCell.textContent = 'SW-OFF';
+    updateCellColor(mainCell);
+    refreshPartnerViews();
+}
+
+// Redraw the partner row and balance from the recorded swaps
+function refreshPartnerViews() {
+    if (activePartner) displayComparisonLine(activePartner.displayLabel, activePartner.data);
+    updatePartnersPanel();
+}
+
+// Kept for compatibility (counts now come from the recorded swaps)
+function trackSwap(direction) {
     updatePartnersPanel();
 }
 
 function clearAllPartners() {
+    var any = swapPartners.some(function (p) { return Object.keys(p.swaps || {}).length; });
+    if (any && !confirm('Clear all partners? Your swaps stay on your schedule, but they will no longer be tracked or counted.')) return;
     swapPartners = [];
     activePartner = null;
     comparisonLineData = null;
@@ -5223,11 +5395,28 @@ function displayComparisonLine(lineNum, data) {
             }
         }
 
-        cell.textContent = shift;
+        // Recorded swaps with this partner change what their row shows
+        var rec = activePartner && activePartner.swaps ? activePartner.swaps[dateStr] : null;
+        cell.style.background = '';
+        cell.style.color = '';
+        cell.classList.remove('cmp-gave', 'cmp-got');
+        if (rec && rec.dir === 'receive') {
+            cell.textContent = 'SW-OFF';          // they gave this shift to you
+            cell.classList.add('cmp-gave');
+            cell.style.background = '#95a5a6';
+            cell.style.color = '#fff';
+        } else if (rec && rec.dir === 'give') {
+            cell.textContent = 'SW-' + rec.shift; // you gave them your shift
+            cell.classList.add('cmp-got');
+            cell.style.background = '#27ae60';
+            cell.style.color = '#fff';
+        } else {
+            cell.textContent = shift;
+        }
         cell.setAttribute('data-value', shift);
         cell.setAttribute('draggable', 'true');
 
-        if (shift === '--') {
+        if (shift === '--' && !rec) {
             cell.classList.add('off-day');
         } else {
             cell.classList.remove('off-day');
@@ -5238,66 +5427,68 @@ function displayComparisonLine(lineNum, data) {
     setupComparisonDrag();
 }
 
+var comparisonEventsReady = false;
 function setupComparisonDrag() {
     var compareCells = document.querySelectorAll('.compare-cell');
-    for (var i = 0; i < compareCells.length; i++) {
-        // Add swap-target class for visual feedback
-        compareCells[i].classList.add('swap-target');
+    for (var i = 0; i < compareCells.length; i++) compareCells[i].classList.add('swap-target');
+    if (comparisonEventsReady) return;
+    comparisonEventsReady = true;
 
-        // Click to receive swap from selected main cell
-        compareCells[i].addEventListener('click', function(e) {
-            if (selectedMainCell) {
-                e.preventDefault();
-                e.stopPropagation();
-                swapToComparisonCell(this);
-            }
-        });
+    function cmpCell(e) { return e.target && e.target.closest ? e.target.closest('.compare-cell') : null; }
 
-        // Drag FROM comparison cell
-        compareCells[i].addEventListener('dragstart', function(e) {
-            var shift = this.getAttribute('data-value');
-            if (shift && shift !== '--' && shift !== 'SW-OFF') {
-                draggedValue = shift;
-                draggedType = 'swap';  // Auto-swap from comparison line
-                draggedSourceCell = this;  // Track source for SWAP OFF marking
-                e.dataTransfer.effectAllowed = 'copy';
-            } else {
-                e.preventDefault();
-            }
-        });
-
-        // Allow dropping ON comparison cells (for bi-directional swap)
-        compareCells[i].addEventListener('dragover', function(e) {
-            if (draggedType === 'mainshift') {
-                e.preventDefault();
-                this.classList.add('drag-over');
-            }
-        });
-
-        compareCells[i].addEventListener('dragleave', function(e) {
-            this.classList.remove('drag-over');
-        });
-
-        compareCells[i].addEventListener('drop', function(e) {
+    // Give Shift Mode: click their day to give the selected shift
+    document.addEventListener('click', function(e) {
+        var c = cmpCell(e);
+        if (c && selectedMainCell) {
             e.preventDefault();
-            this.classList.remove('drag-over');
+            e.stopPropagation();
+            swapToComparisonCell(c);
+        }
+    }, true);
 
-            // Only accept drops from main line
-            if (draggedType === 'mainshift' && draggedSourceCell) {
-                // Mark main source cell as SWAP OFF (you're giving it up)
-                draggedSourceCell.textContent = 'SW-OFF';
-                updateCellColor(draggedSourceCell);
+    // Drag FROM the partner row
+    document.addEventListener('dragstart', function(e) {
+        var c = cmpCell(e);
+        if (!c || !activePartner) return;
+        var rec = activePartner.swaps[c.getAttribute('data-date')];
+        var shift = c.getAttribute('data-value');
+        if ((rec && rec.dir === 'give') || (!rec && shift && shift !== '--')) {
+            draggedValue = rec ? rec.shift : shift;
+            draggedType = 'swap';
+            draggedSourceCell = c;
+            e.dataTransfer.effectAllowed = 'copy';
+        } else {
+            e.preventDefault();
+        }
+    });
 
-                // Show the swap on comparison cell (visual only - they're receiving)
-                this.textContent = 'SW-' + draggedValue;
-                this.style.background = '#27ae60';
-                this.style.color = '#fff';
+    document.addEventListener('dragend', function(e) {
+        if (cmpCell(e)) clearDragState();
+    });
 
-                // Track this as giving a shift to partner
-                trackSwap('give');
-            }
-        });
-    }
+    // Drop ON the partner row (give a shift, or give back one you took)
+    document.addEventListener('dragover', function(e) {
+        var c = cmpCell(e);
+        if (c && draggedType === 'mainshift') {
+            e.preventDefault();
+            c.classList.add('drag-over');
+        }
+    });
+    document.addEventListener('dragleave', function(e) {
+        var c = cmpCell(e);
+        if (c) c.classList.remove('drag-over');
+    });
+    document.addEventListener('drop', function(e) {
+        var c = cmpCell(e);
+        if (!c) return;
+        e.preventDefault();
+        c.classList.remove('drag-over');
+        if (draggedType === 'mainshift' && draggedSourceCell) {
+            var src = draggedSourceCell;
+            clearDragState();
+            giveShiftToPartner(src, c);
+        }
+    });
 }
 
 function clearComparisonLine() {
@@ -5323,8 +5514,10 @@ function clearComparisonLine() {
     for (var c = 0; c < compareCells.length; c++) {
         compareCells[c].textContent = '--';
         compareCells[c].removeAttribute('draggable');
+        compareCells[c].removeAttribute('data-value');
         compareCells[c].style.background = '';
         compareCells[c].style.color = '';
+        compareCells[c].classList.remove('cmp-gave', 'cmp-got');
     }
 }
 
@@ -5457,34 +5650,41 @@ document.addEventListener('mousedown', function(e) {
         if (startIdx > -1 && endIdx > -1) {
             if (startIdx > endIdx) { var tmp = startIdx; startIdx = endIdx; endIdx = tmp; }
             saveToUndo();
+            var skipped = 0;
             for (var j = startIdx; j <= endIdx; j++) {
+                if (findSwapForMainDate(allCells[j].getAttribute('data-date'))) { skipped++; continue; }
                 allCells[j].textContent = quickApplyValue;
                 updateCellColor(allCells[j]);
             }
+            if (skipped) alert(skipped + ' day(s) that are part of a swap were left alone.');
             lastQuickApplyCell = cell;
             return;
         }
     }
 
-    saveToUndo();
-
+    if (findSwapForMainDate(cell.getAttribute('data-date'))) {
+        alert('This day is part of a swap. Undo the swap first (drag it back, or use UNDO).');
+        return;
+    }
+    if (quickApplyType === 'compwork') {
+        showDeskPopup(cell);   // undo point is saved when a desk is picked
+        return;
+    }
+    var newText = quickApplyValue;
     if (quickApplyType === 'shift') {
         var choice = prompt('Is this shift a:\\n1 = Regular\\n2 = SWAP\\n3 = OT\\n4 = DT\\n\\nEnter 1-4:');
-        if (choice === '2') cell.textContent = 'SW-' + quickApplyValue;
-        else if (choice === '3') cell.textContent = 'OT-' + quickApplyValue;
-        else if (choice === '4') cell.textContent = 'DT-' + quickApplyValue;
-        else cell.textContent = quickApplyValue;
-    } else if (quickApplyType === 'compwork') {
-        showDeskPopup(cell);
-        return;
+        if (choice === null) return;   // Cancel = no change
+        if (choice === '2') newText = 'SW-' + quickApplyValue;
+        else if (choice === '3') newText = 'OT-' + quickApplyValue;
+        else if (choice === '4') newText = 'DT-' + quickApplyValue;
     } else if (quickApplyType === 'special') {
         var specChoice = prompt(quickApplyValue + ' - Is this:\\n1 = COMP\\n2 = OT\\n\\nEnter 1 or 2:');
-        if (specChoice === '1') cell.textContent = 'C-' + quickApplyValue;
-        else if (specChoice === '2') cell.textContent = 'OT-' + quickApplyValue;
-        else cell.textContent = quickApplyValue;
-    } else {
-        cell.textContent = quickApplyValue;
+        if (specChoice === null) return;   // Cancel = no change
+        if (specChoice === '1') newText = 'C-' + quickApplyValue;
+        else if (specChoice === '2') newText = 'OT-' + quickApplyValue;
     }
+    saveToUndo();
+    cell.textContent = newText;
     updateCellColor(cell);
     lastQuickApplyCell = cell;
 }, true);
