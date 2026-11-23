@@ -2995,8 +2995,8 @@ function isLineConfirmed(lineNbr) {
                 var bgColor = isSameLine ? '#0a0a0a' : (isCompatible ? '#2d5016' : '#1a1a2e');
                 var text = isSameLine ? '—' : (isCompatible ? '✓' : '');
                 var textColor = isCompatible ? '#4ecca3' : '#555';
-                var tip = isCompatible ? ' title="Line ' + getDisplayNumber(lineA) + ' and Line ' + getDisplayNumber(lineB) + ' can swap"' : '';
-                html += '<td' + tip + ' style="padding:4px 2px; border:1px solid #333; background:' + bgColor + '; color:' + textColor + '; text-align:center; font-weight:bold; font-size:13px; min-width:24px; max-width:24px;">' + text + '</td>';
+                var tip = isCompatible ? ' title="Line ' + getDisplayNumber(lineA) + ' and Line ' + getDisplayNumber(lineB) + ' can swap. Click to open Line ' + getDisplayNumber(lineA) + ' in Your Edit with Auto-Swap ready." onclick="openAutoSwapFromCompare(\'' + lineA + '\', \'' + lineB + '\')"' : '';
+                html += '<td' + tip + ' style="padding:4px 2px; border:1px solid #333; background:' + bgColor + '; color:' + textColor + '; text-align:center; font-weight:bold; font-size:13px; min-width:24px; max-width:24px;' + (isCompatible ? ' cursor:pointer;' : '') + '">' + text + '</td>';
             });
             html += '</tr>';
         });
@@ -3019,7 +3019,7 @@ function isLineConfirmed(lineNbr) {
         var results = analyzeSwapPairs();
         var catRes = results[category];
         var html = renderExampleDiagram(category);
-        html += '<div style="font-size:10px; color:#888; margin-bottom:15px;"><span style="color:#4ecca3;">✓ = Lines are compatible for this swap type (8-hour rest rule enforced)</span></div>';
+        html += '<div style="font-size:10px; color:#888; margin-bottom:15px;"><span style="color:#4ecca3;">✓ = Lines are compatible for this swap type (8-hour rest rule enforced). Click a ✓ to set it up in Your Edit with ⚡ Auto-Swap.</span></div>';
         html += '<div style="margin-bottom:30px;"><h4 style="color:#e94560; margin-bottom:10px; font-size:14px;">SSOM Lines Compatibility Grid</h4>';
         html += renderCompatibilityGrid(catRes.ssom, true);
         html += '</div>';
@@ -3048,6 +3048,14 @@ function isLineConfirmed(lineNbr) {
     }
     // New patterns loaded (upload or refresh): re-run the analysis next time it's shown
     window.addEventListener('patternsLoaded', function () { swapAnalysisCache = null; });
+
+    // From the Compare grid: open Your Edit on line A with line B added and Auto-Swap open
+    function openAutoSwapFromCompare(lineA, lineB) {
+        const type = currentSwapCategory === 'twoDayPickup' ? '2d' : '57';
+        try { sessionStorage.setItem('yourEditAutoSwap', JSON.stringify({ line: lineA, partner: lineB, type: type })); } catch (e) {}
+        hideSwapCompare();
+        exportYearOverviewHTML(lineA);
+    }
 
     // Print windows: tell the user if the browser blocked the pop-up (used to fail silently)
     function openPrintWindow(features) {
@@ -3878,6 +3886,8 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 #myLifePanel .row { margin: 8px 0; }
 #myLifePanel button { padding: 6px 14px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
 @media print { #myLifePanel { display: none !important; } }
+#autoSwapPanel { display: none; position: fixed; z-index: 20000; top: 40px; left: 50%; transform: translateX(-50%); background: #fff; color: #222; border: 3px solid #7c3aed; border-radius: 10px; padding: 14px 18px; width: 660px; max-width: 96vw; max-height: 88vh; overflow: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.45); font-family: Arial, sans-serif; font-size: 13px; }
+@media print { #autoSwapPanel { display: none !important; } }
 .drag-palette { display: flex; gap: 8px; justify-content: flex-start; margin: 8px 0; padding: 8px 10px; background: #f0f0f0; border-radius: 8px; align-items: center; }
 .instructions { background: #e8f4fc; border: 1px solid #0066cc; border-radius: 8px; padding: 10px 15px; margin: 10px 0; font-size: 11px; color: #333; }
 .instructions b { color: #0066cc; }
@@ -4125,7 +4135,11 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
     <div id="partnersPanel" class="no-print" style="display:none; background:#1a1a2e; border:2px solid #9b59b6; border-radius:8px; padding:10px 15px; margin:5px 0;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <b style="color:#9b59b6;">📊 Swap Partners Balance</b>
-            <span id="totalBalance" style="font-size:12px; color:#888;"></span>
+            <span>
+                <button id="autoSwapBtn" onclick="openAutoSwap()" disabled style="background:#7c3aed; color:#fff; font-weight:bold; border:none; border-radius:5px; padding:4px 12px; cursor:pointer; opacity:0.45;">⚡ Auto-Swap</button>
+                <button id="partnerCopyBtn" onclick="savePartnerCopy()" disabled style="background:#0e7490; color:#fff; font-weight:bold; border:none; border-radius:5px; padding:4px 12px; cursor:pointer; opacity:0.45;">📤 Partner's copy</button>
+                <span id="totalBalance" style="font-size:12px; color:#888; margin-left:8px;"></span>
+            </span>
         </div>
         <div id="partnersList" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
     </div>
@@ -4990,6 +5004,24 @@ var activePartner = null;
 // Seasonal desks data for proper shift transformation
 var SEASONAL_DESKS = ${JSON.stringify(window.SEASONAL_DESKS || [])};
 
+// Every line's real day-by-day shifts for this bid year (May changes + seasonal desks included)
+var LINE_CAL = ${JSON.stringify((function () {
+    const out = {};
+    if (typeof ALL_LINES_CALENDAR === 'undefined' || !ALL_LINES_CALENDAR) return out;
+    const start = new Date(bidYear, 3, 1), end = new Date(bidYear + 1, 2, 31);
+    Object.keys(ALL_LINES_CALENDAR).forEach(function (k) {
+        const cal = ALL_LINES_CALENDAR[k];
+        if (!cal || !cal.days) return;
+        const arr = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const key = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+            arr.push(cal.days[key] ? cal.days[key].s : null);
+        }
+        out[k] = arr;
+    });
+    return out;
+})()).replace(/</g, '\\u003c')};
+
 // All lines data - populated from main app
 var allLinesData = {};
 (function() {
@@ -5160,7 +5192,7 @@ function addSwapPartner() {
         lineKey: lineKey,
         displayLabel: displayLabel,
         displayNum: lineInfo.displayNum,
-        data: { days: lineInfo.days },
+        data: { days: lineInfo.days, lineKey: lineKey },
         swaps: {}      // partner date -> { dir: 'give'|'receive', mainDate, mainBefore, shift }
     };
     swapPartners.push(partner);
@@ -5219,6 +5251,7 @@ function removeSwapPartner(lineKey) {
 }
 
 function updatePartnersPanel() {
+    setTimeout(function () { if (typeof updateAutoSwapButton === 'function') updateAutoSwapButton(); }, 0);
     var panel = document.getElementById('partnersPanel');
     var list = document.getElementById('partnersList');
     var totalEl = document.getElementById('totalBalance');
@@ -5448,23 +5481,8 @@ function displayComparisonLine(lineNum, data) {
         var patternIndex = dayIndex % patternLength;
         if (patternIndex < 0) patternIndex += patternLength;  // Handle negative
 
-        var shift = data.days[patternIndex] || '--';
-
-        // Check for seasonal desk transformation
-        if (shift !== '--' && SEASONAL_DESKS && SEASONAL_DESKS.length > 0) {
-            for (var s = 0; s < SEASONAL_DESKS.length; s++) {
-                var sd = SEASONAL_DESKS[s];
-                if (shift === sd.code) {
-                    // Check if date is outside active period
-                    var activeFrom = new Date(sd.activeFrom);
-                    var activeTo = new Date(sd.activeTo);
-                    if (cellDate < activeFrom || cellDate > activeTo) {
-                        shift = sd.outsideBecomes || 'XXX';
-                    }
-                    break;
-                }
-            }
-        }
+        // Partner's real shift that day (May changes and seasonal desks included)
+        var shift = lineCodeOn((data && data.lineKey) || (activePartner ? activePartner.lineKey : ''), dateStr);
 
         // Recorded swaps with this partner change what their row shows
         var rec = activePartner && activePartner.swaps ? activePartner.swaps[dateStr] : null;
@@ -5874,7 +5892,7 @@ function cleanSwaps(sw) {
 function partnerFromKey(lineKey, swaps) {
     var info = allLinesData[lineKey];
     if (!info) return null;
-    return { lineKey: lineKey, displayLabel: info.displayNum + '-' + info.lineDesc, displayNum: info.displayNum, data: { days: info.days }, swaps: cleanSwaps(swaps) };
+    return { lineKey: lineKey, displayLabel: info.displayNum + '-' + info.lineDesc, displayNum: info.displayNum, data: { days: info.days, lineKey: lineKey }, swaps: cleanSwaps(swaps) };
 }
 
 function applyPlan(plan) {
@@ -5940,6 +5958,375 @@ window.addEventListener('DOMContentLoaded', function () {
         try { sessionStorage.removeItem('yourEditPendingPlan'); } catch (e) {}
         setTimeout(function () { loadPlan(plan); }, 0);
     }
+});
+
+// ================= AUTO-SWAP (5 On / 7 Off and 2-Day Pickup) =================
+// Uses each line's real calendar (LINE_CAL), the 8-hour rest rule (relief = 09:00-21:00,
+// X for X always OK), and records every day as a normal swap so UNDO / drag-back / SAVE work.
+var AS_RELIEF_START = 9;
+var AS_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var autoSwapState = null;
+
+function asIsOff(c) { return !c || c === '--' || c === '-'; }
+function asIsRelief(c) { return typeof c === 'string' && c.indexOf('XX') === 0; }
+function asStart(c) {
+    if (asIsOff(c)) return null;
+    if (asIsRelief(c)) return AS_RELIEF_START;
+    var m = String(c).match(/[EAMP]([0-9]{2})/);
+    return m ? parseInt(m[1], 10) : null;
+}
+function asRestOK(a, b) {
+    if (asIsRelief(a) && asIsRelief(b)) return true;
+    var sa = asStart(a), sb = asStart(b);
+    if (sa === null || sb === null) return true;
+    return 12 + sb - sa >= 8;
+}
+function asDayIndex(dateStr) {
+    var p = String(dateStr).split('-').map(Number);
+    return Math.round((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(CURRENT_BID_YEAR, 3, 1)) / 86400000);
+}
+function asDateOf(idx) {
+    var d = new Date(Date.UTC(CURRENT_BID_YEAR, 3, 1) + idx * 86400000);
+    return d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1) + '-' + d.getUTCDate();
+}
+function asNice(idx) {
+    var d = new Date(Date.UTC(CURRENT_BID_YEAR, 3, 1) + idx * 86400000);
+    return AS_MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate();
+}
+function asTotalDays() {
+    return Math.round((Date.UTC(CURRENT_BID_YEAR + 1, 2, 31) - Date.UTC(CURRENT_BID_YEAR, 3, 1)) / 86400000) + 1;
+}
+
+// A line's real shift on a date (May changes and seasonal desks included)
+function lineCodeOn(lineKey, dateStr) {
+    var arr = LINE_CAL[lineKey];
+    var i = asDayIndex(dateStr);
+    if (arr && i >= 0 && i < arr.length && arr[i] !== null) return arr[i];
+    var info = allLinesData[lineKey];
+    if (!info || !info.days) return '--';
+    var n = info.days.length;
+    return info.days[((i % n) + n) % n] || '--';
+}
+
+// ---- pattern-level matching (12-day cycle) ----
+function asRuns(daySet) {
+    var s = {}, out = [];
+    daySet.forEach(function (d) { s[d] = true; });
+    if (daySet.length === 12) return [daySet.slice().sort(function (a, b) { return a - b; })];
+    daySet.forEach(function (st) {
+        if (s[(st + 11) % 12]) return;
+        var r = [st], j = (st + 1) % 12;
+        while (s[j]) { r.push(j); j = (j + 1) % 12; }
+        out.push(r);
+    });
+    return out;
+}
+function asWork(p) { var w = []; for (var i = 0; i < 12; i++) if (!asIsOff(p[i])) w.push(i); return w; }
+function asBlocks(p, n) { return asRuns(asWork(p)).filter(function (r) { return r.length === n; }); }
+function asCyclicRestOK(p) {
+    for (var i = 0; i < 12; i++) if (!asRestOK(p[i], p[(i + 1) % 12])) return false;
+    return true;
+}
+function asSingleRun(p, len) { var r = asRuns(asWork(p)); return r.length === 1 && r[0].length === len; }
+
+function autoSwapOptions(myKey, theirKey) {
+    var mine = allLinesData[myKey] && allLinesData[myKey].days, theirs = allLinesData[theirKey] && allLinesData[theirKey].days;
+    var out = [];
+    if (!mine || !theirs || mine.length !== 12 || theirs.length !== 12) return out;
+    if (allLinesData[myKey].lineDesc !== allLinesData[theirKey].lineDesc) return out;
+    asBlocks(mine, 2).forEach(function (X) {          // my 2-day block
+        asBlocks(theirs, 2).forEach(function (Y) {    // their 2-day block
+            var yOffMine = Y.every(function (i) { return asIsOff(mine[i]); });
+            var xOffTheirs = X.every(function (i) { return asIsOff(theirs[i]); });
+            if (!yOffMine || !xOffTheirs) return;
+            // 5 On / 7 Off: every cycle I take Y and give X; they take X and give Y
+            var nm = mine.slice(), nt = theirs.slice();
+            X.forEach(function (i) { nm[i] = '--'; nt[i] = mine[i]; });
+            Y.forEach(function (i) { nt[i] = '--'; nm[i] = theirs[i]; });
+            if (asSingleRun(nm, 5) && asSingleRun(nt, 5) && asCyclicRestOK(nm) && asCyclicRestOK(nt)) {
+                out.push({ type: '57', give: X, take: Y });
+            }
+            // 2-Day Pickup: X and Y sit side by side (4 days); cycles alternate who works all 4
+            var both = asRuns(X.concat(Y));
+            if (both.length === 1 && both[0].length === 4) {
+                var m1 = mine.slice(), t2 = theirs.slice();
+                Y.forEach(function (i) { m1[i] = theirs[i]; });
+                X.forEach(function (i) { t2[i] = mine[i]; });
+                if (asCyclicRestOK(m1) && asCyclicRestOK(t2)) out.push({ type: '2d', give: X, take: Y });
+            }
+        });
+    });
+    return out;
+}
+
+// ---- clean-schedule check ----
+function scheduleIsClean() {
+    var all = document.querySelectorAll('.shift-cell');
+    var orig = originalState && originalState.cells ? originalState.cells : [];
+    for (var i = 0; i < all.length; i++) {
+        if (orig[i] && all[i].textContent.trim() !== String(orig[i].text).trim()) return false;
+    }
+    for (var p = 0; p < swapPartners.length; p++) if (Object.keys(swapPartners[p].swaps || {}).length) return false;
+    return true;
+}
+
+var AUTO_SWAP_CAVEAT = 'Auto-Swap can only be done BEFORE vacation is bid or any other swaps are made. Both schedules must start clean.';
+
+// ---- build the plan over real dates ----
+function buildAutoSwapPlan(opt, fromIdx, toIdx, meFirst, keepEven) {
+    var total = asTotalDays();
+    var myCodes = [], theirCodes = [];
+    for (var i = 0; i < total; i++) {
+        var ds = asDateOf(i);
+        var c = mainCellFor(ds);
+        myCodes.push(c ? c.textContent.trim() : '--');
+        theirCodes.push(lineCodeOn(activePartner.lineKey, ds));
+    }
+    var nm = myCodes.slice(), nt = theirCodes.slice();
+    var applied = [], skipped = [];
+    var cycles = Math.ceil(total / 12);
+    var twoDayTurn = 0;
+    for (var k = 0; k < cycles; k++) {
+        var s = k * 12;
+        var takeIdx = [], giveIdx = [];
+        if (opt.type === '57') {
+            takeIdx = opt.take.map(function (p) { return s + p; });
+            giveIdx = opt.give.map(function (p) { return s + p; });
+        } else {
+            var iPickUp = (twoDayTurn % 2 === 0) === meFirst;
+            if (iPickUp) takeIdx = opt.take.map(function (p) { return s + p; });
+            else giveIdx = opt.give.map(function (p) { return s + p; });
+        }
+        var idxs = takeIdx.concat(giveIdx);
+        if (idxs.some(function (x) { return x < fromIdx || x > toIdx || x >= total; })) continue;   // outside range
+        if (opt.type === '2d') twoDayTurn++;
+        var why = '';
+        takeIdx.forEach(function (x) {
+            if (!why && !asIsOff(nm[x])) why = 'you already work ' + nm[x] + ' on ' + asNice(x);
+            if (!why && asIsOff(nt[x])) why = 'they are off on ' + asNice(x);
+        });
+        giveIdx.forEach(function (x) {
+            if (!why && asIsOff(nm[x])) why = 'you are off on ' + asNice(x);
+            if (!why && !asIsOff(nt[x])) why = 'they already work ' + nt[x] + ' on ' + asNice(x);
+        });
+        if (!why) {
+            var keepM = nm.slice(), keepT = nt.slice();
+            takeIdx.forEach(function (x) { nm[x] = nt[x]; nt[x] = '--'; });
+            giveIdx.forEach(function (x) { nt[x] = nm[x]; nm[x] = '--'; });
+            idxs.forEach(function (x) {
+                [x - 1, x].forEach(function (a) {
+                    if (why || a < 0 || a + 1 >= total) return;
+                    if (!asRestOK(nm[a], nm[a + 1])) why = '8-hour rest (you) ' + asNice(a) + ' to ' + asNice(a + 1);
+                    else if (!asRestOK(nt[a], nt[a + 1])) why = '8-hour rest (them) ' + asNice(a) + ' to ' + asNice(a + 1);
+                });
+            });
+            if (why) { nm = keepM; nt = keepT; }
+        }
+        if (why) skipped.push({ cycle: k + 1, from: s, why: why });
+        else applied.push({ cycle: k + 1, take: takeIdx, give: giveIdx });
+    }
+    var taken = 0, given = 0;
+    applied.forEach(function (a) { taken += a.take.length; given += a.give.length; });
+    var trimmed = null;
+    if (keepEven && opt.type === '2d' && taken !== given) {
+        for (var j = applied.length - 1; j >= 0; j--) {
+            var a = applied[j];
+            if ((taken > given && a.take.length) || (given > taken && a.give.length)) {
+                trimmed = a; applied.splice(j, 1);
+                taken -= a.take.length; given -= a.give.length;
+                break;
+            }
+        }
+    }
+    return { applied: applied, skipped: skipped, taken: taken, given: given, trimmed: trimmed, myCodes: myCodes, theirCodes: theirCodes };
+}
+
+// ---- panel ----
+function updateAutoSwapButton() {
+    var btn = document.getElementById('autoSwapBtn');
+    var copyBtn = document.getElementById('partnerCopyBtn');
+    if (!btn) return;
+    if (!activePartner) { btn.disabled = true; btn.title = 'Add a swap partner first'; if (copyBtn) copyBtn.disabled = true; return; }
+    var opts = autoSwapOptions(CURRENT_LINE, activePartner.lineKey);
+    btn.disabled = !opts.length;
+    btn.title = opts.length ? 'Set up a 5 On/7 Off or 2-Day Pickup swap with L' + activePartner.displayNum + ' for you'
+        : (allLinesData[CURRENT_LINE].lineDesc !== allLinesData[activePartner.lineKey].lineDesc
+            ? 'Auto-Swap only works within the same group (SSOM with SSOM, SOM with SOM)'
+            : 'L' + activePartner.displayNum + ' is not a 5 On/7 Off or 2-Day Pickup match with your line');
+    btn.style.opacity = opts.length ? '1' : '0.45';
+    if (copyBtn) {
+        var has = Object.keys(activePartner.swaps || {}).length > 0;
+        copyBtn.disabled = !has;
+        copyBtn.style.opacity = has ? '1' : '0.45';
+        copyBtn.title = has ? "Save a plan file for L" + activePartner.displayNum + " with the same swaps from their side" : 'Make swaps with this partner first';
+    }
+}
+
+function asPatternStrip(days, hl, color) {
+    var h = '<div style="display:flex; gap:2px;">';
+    for (var i = 0; i < 12; i++) {
+        var off = asIsOff(days[i]);
+        var on = hl.indexOf(i) !== -1;
+        h += '<div style="width:44px; text-align:center; font-size:9px; padding:2px 0; border-radius:3px; background:' + (off ? '#00d26a' : '#ffc000') + '; color:#000; border:' + (on ? '3px solid ' + color : '1px solid #333') + ';"><div style="font-size:8px; opacity:0.7;">' + (i + 1) + '</div><b>' + (off ? '--' : myLifeEsc(days[i])) + '</b></div>';
+    }
+    return h + '</div>';
+}
+
+function openAutoSwap(preferType) {
+    if (!activePartner) { alert('Add a swap partner first, then click Auto-Swap.'); return; }
+    var opts = autoSwapOptions(CURRENT_LINE, activePartner.lineKey);
+    if (!opts.length) { alert(document.getElementById('autoSwapBtn').title); return; }
+    if (!scheduleIsClean()) {
+        alert(AUTO_SWAP_CAVEAT + ' Your schedule already has changes or swaps. Use RESET (or UNDO) to start clean, then try again.');
+        return;
+    }
+    if (!confirm(AUTO_SWAP_CAVEAT + ' Continue?')) return;
+    var first = 0;
+    for (var i = 0; i < opts.length; i++) if (preferType && opts[i].type === preferType) { first = i; break; }
+    autoSwapState = { opts: opts, sel: first, meFirst: true, keepEven: true, fromIdx: 0, toIdx: asTotalDays() - 1 };
+    renderAutoSwapPanel();
+}
+
+function renderAutoSwapPanel() {
+    var st = autoSwapState;
+    var opt = st.opts[st.sel];
+    var mine = allLinesData[CURRENT_LINE].days, theirs = allLinesData[activePartner.lineKey].days;
+    var me = 'L' + allLinesData[CURRENT_LINE].displayNum, them = 'L' + activePartner.displayNum;
+    var plan = buildAutoSwapPlan(opt, st.fromIdx, st.toIdx, st.meFirst, st.keepEven);
+    st.plan = plan;
+    var panel = document.getElementById('autoSwapPanel');
+    if (!panel) { panel = document.createElement('div'); panel.id = 'autoSwapPanel'; document.body.appendChild(panel); }
+    var h = '<h3 style="margin:0 0 6px; color:#7c3aed;">&#9889; Auto-Swap: ' + me + ' with ' + them + ' (' + allLinesData[CURRENT_LINE].lineDesc + ')</h3>';
+    h += '<div style="background:#fff3cd; border:1px solid #f0ad4e; border-radius:6px; padding:6px 10px; font-size:12px; margin-bottom:8px;"><b>Note:</b> ' + AUTO_SWAP_CAVEAT + '</div>';
+    h += '<div style="font-weight:bold; margin:6px 0 4px;">1. Pick the swap</div>';
+    st.opts.forEach(function (o, i) {
+        var name = o.type === '57' ? '5 On / 7 Off' : '2-Day Pickup';
+        var desc = o.type === '57'
+            ? 'Every cycle you work their days ' + o.take.map(function (x) { return x + 1; }).join(',') + ' and they work your days ' + o.give.map(function (x) { return x + 1; }).join(',') + '.'
+            : 'Cycles take turns: one cycle you work all 4 days (' + o.give.concat(o.take).map(function (x) { return x + 1; }).join(',') + '), the next cycle they do.';
+        h += '<label style="display:block; border:2px solid ' + (i === st.sel ? '#7c3aed' : '#ddd') + '; border-radius:8px; padding:6px 8px; margin-bottom:6px; cursor:pointer;">' +
+            '<input type="radio" name="asOpt" ' + (i === st.sel ? 'checked' : '') + ' onchange="autoSwapState.sel=' + i + '; renderAutoSwapPanel();"> <b>' + name + '</b> <span style="font-size:12px; color:#555;">' + desc + '</span>' +
+            '<div style="margin-top:4px; font-size:11px;">' + me + ' (you): red = days you give</div>' + asPatternStrip(mine, o.give, '#e11d48') +
+            '<div style="margin-top:2px; font-size:11px;">' + them + ': purple = days you pick up</div>' + asPatternStrip(theirs, o.take, '#7c3aed') + '</label>';
+    });
+    if (opt.type === '2d') {
+        h += '<div style="font-weight:bold; margin:8px 0 4px;">2. Who works all 4 days first?</div>' +
+            '<label><input type="radio" name="asFirst" ' + (st.meFirst ? 'checked' : '') + ' onchange="autoSwapState.meFirst=true; renderAutoSwapPanel();"> Me (' + me + ') on cycle 1</label> &nbsp; ' +
+            '<label><input type="radio" name="asFirst" ' + (!st.meFirst ? 'checked' : '') + ' onchange="autoSwapState.meFirst=false; renderAutoSwapPanel();"> ' + them + ' on cycle 1</label>' +
+            '<div style="margin-top:4px;"><label><input type="checkbox" ' + (st.keepEven ? 'checked' : '') + ' onchange="autoSwapState.keepEven=this.checked; renderAutoSwapPanel();"> Keep it even (drop the last cycle if one of you would end up ahead)</label></div>';
+    }
+    h += '<div style="font-weight:bold; margin:8px 0 4px;">' + (opt.type === '2d' ? '3' : '2') + '. Dates (whole bid year by default; you can also UNDO later)</div>' +
+        'From <input type="date" id="asFrom" value="' + asIso(st.fromIdx) + '" min="' + asIso(0) + '" max="' + asIso(asTotalDays() - 1) + '" onchange="asSetRange()"> ' +
+        'to <input type="date" id="asTo" value="' + asIso(st.toIdx) + '" min="' + asIso(0) + '" max="' + asIso(asTotalDays() - 1) + '" onchange="asSetRange()">';
+    var net = plan.taken - plan.given;
+    h += '<div style="background:#f3f4f6; border-radius:6px; padding:8px 10px; margin-top:10px; font-size:13px;">' +
+        '<b>Preview:</b> ' + plan.applied.length + ' cycles. You pick up <b>' + plan.taken + '</b> days and give <b>' + plan.given + '</b> days (net ' + (net > 0 ? '+' : '') + net + ').' +
+        (plan.trimmed ? '<br>Dropped cycle ' + plan.trimmed.cycle + ' to keep it even.' : '') +
+        (plan.skipped.length ? '<br><span style="color:#b45309;">' + plan.skipped.length + ' cycle(s) skipped:</span><ul style="margin:4px 0 0 18px; max-height:90px; overflow:auto; font-size:12px;">' +
+            plan.skipped.map(function (s) { return '<li>Cycle ' + s.cycle + ' (starts ' + asNice(s.from) + '): ' + myLifeEsc(s.why) + '</li>'; }).join('') + '</ul>' : '') +
+        '</div>';
+    h += '<div style="margin-top:10px; text-align:right;">' +
+        '<button onclick="closeAutoSwap()" style="background:#e5e7eb; color:#111; padding:7px 16px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Cancel</button> ' +
+        '<button onclick="applyAutoSwap()" ' + (plan.applied.length ? '' : 'disabled') + ' style="background:#7c3aed; color:#fff; padding:7px 16px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">&#9889; Apply ' + plan.applied.length + ' cycles</button></div>';
+    panel.innerHTML = h;
+    panel.style.display = 'block';
+}
+
+function asIso(idx) {
+    var d = new Date(Date.UTC(CURRENT_BID_YEAR, 3, 1) + idx * 86400000);
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+
+function asSetRange() {
+    var f = document.getElementById('asFrom').value, t = document.getElementById('asTo').value;
+    if (f) autoSwapState.fromIdx = Math.max(0, asDayIndex(f.split('-').map(Number).join('-')));
+    if (t) autoSwapState.toIdx = Math.min(asTotalDays() - 1, asDayIndex(t.split('-').map(Number).join('-')));
+    if (autoSwapState.toIdx < autoSwapState.fromIdx) autoSwapState.toIdx = autoSwapState.fromIdx;
+    renderAutoSwapPanel();
+}
+
+function closeAutoSwap() {
+    var p = document.getElementById('autoSwapPanel');
+    if (p) p.style.display = 'none';
+}
+
+function applyAutoSwap() {
+    var st = autoSwapState, plan = st && st.plan;
+    if (!plan || !plan.applied.length || !activePartner) return;
+    saveToUndo();   // one UNDO removes the whole Auto-Swap
+    var days = 0;
+    plan.applied.forEach(function (a) {
+        a.take.forEach(function (x) {
+            var ds = asDateOf(x), cell = mainCellFor(ds);
+            if (!cell) return;
+            activePartner.swaps[ds] = { dir: 'receive', mainDate: ds, mainBefore: cell.textContent.trim(), shift: plan.theirCodes[x] };
+            cell.textContent = 'SW-' + plan.theirCodes[x];
+            updateCellColor(cell);
+            days++;
+        });
+        a.give.forEach(function (x) {
+            var ds = asDateOf(x), cell = mainCellFor(ds);
+            if (!cell) return;
+            var mineNow = cell.textContent.trim();
+            activePartner.swaps[ds] = { dir: 'give', mainDate: ds, mainBefore: mineNow, shift: baseShift(mineNow) };
+            cell.textContent = 'SW-OFF';
+            updateCellColor(cell);
+            days++;
+        });
+    });
+    closeAutoSwap();
+    refreshPartnerViews();
+    showPlanToast('Auto-Swap done: ' + plan.applied.length + ' cycles, ' + days + ' days swapped with L' + activePartner.displayNum + '. UNDO takes it all back; drag any day back to undo just that day.');
+}
+
+// ---- partner's copy: the same swaps saved from the partner's side ----
+function savePartnerCopy() {
+    if (!activePartner) return;
+    var sw = activePartner.swaps || {};
+    var keys = Object.keys(sw);
+    if (!keys.length) { alert('Make swaps with this partner first.'); return; }
+    var days = {}, inverse = {};
+    keys.forEach(function (pDate) {
+        var r = sw[pDate];
+        var theirOrig = lineCodeOn(activePartner.lineKey, pDate);
+        if (r.dir === 'receive') {
+            days[pDate] = 'SW-OFF';
+            inverse[r.mainDate] = { dir: 'give', mainDate: pDate, mainBefore: theirOrig, shift: r.shift };
+        } else {
+            days[pDate] = 'SW-' + r.shift;
+            inverse[r.mainDate] = { dir: 'receive', mainDate: pDate, mainBefore: theirOrig, shift: r.shift };
+        }
+    });
+    var plan = {
+        app: PLAN_APP, version: 1, bidYear: CURRENT_BID_YEAR, line: activePartner.lineKey,
+        savedAt: new Date().toISOString(), madeBy: CURRENT_LINE,
+        days: days, marks: {}, partners: [{ lineKey: CURRENT_LINE, swaps: inverse }], activePartner: CURRENT_LINE
+    };
+    var name = 'YourEdit_Line' + activePartner.lineKey + '_' + CURRENT_BID_YEAR + '-' + (CURRENT_BID_YEAR + 1) + '_from_Line' + CURRENT_LINE + '.json';
+    var blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    showPlanToast('Saved ' + name + '. Send it to L' + activePartner.displayNum + ': they open it with OPEN in their Your Edit.');
+}
+
+// ---- opened from the Compare grid: add the partner and open Auto-Swap ----
+window.addEventListener('DOMContentLoaded', function () {
+    var raw = null;
+    try { raw = sessionStorage.getItem('yourEditAutoSwap'); } catch (e) {}
+    if (!raw) return;
+    var req = null;
+    try { req = JSON.parse(raw); } catch (e) {}
+    if (!req || req.line !== CURRENT_LINE || !allLinesData[req.partner]) return;
+    try { sessionStorage.removeItem('yourEditAutoSwap'); } catch (e) {}
+    setTimeout(function () {
+        document.getElementById('compareLineSelect').value = req.partner;
+        addSwapPartner();
+        openAutoSwap(req.type);
+    }, 50);
 });
 </script>
 </body>
@@ -11230,6 +11617,7 @@ const ANNUAL_BID = ${JSON.stringify(setupData.linePatterns, null, 2)};
     window.launchYourEdit = launchYourEdit;
     window.selectAndLaunchYourEdit = selectAndLaunchYourEdit;
     window.openSavedPlanFromPicker = openSavedPlanFromPicker;
+    window.openAutoSwapFromCompare = openAutoSwapFromCompare;
     window.filterLineCards = filterLineCards;
 
     // Change a desk's group assignment
