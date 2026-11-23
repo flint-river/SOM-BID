@@ -3864,6 +3864,9 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .compare-row .compare-cell { cursor: grab; }
 .compare-row .compare-cell:hover { outline: 2px solid #9b59b6; }
 .compare-row .compare-cell.off-day { background: #ffd89b !important; color: #999; }
+/* Partner row swap days - solid colors with white bold text so they're easy to read */
+.compare-row td.compare-cell.cmp-got  { background: #0e7490 !important; color: #fff !important; font-weight: bold; }  /* you gave them your shift */
+.compare-row td.compare-cell.cmp-gave { background: #4b5563 !important; color: #fff !important; font-weight: bold; }  /* they gave their shift to you */
 .shift-cell.holiday-cell { font-weight: bold !important; border: 3px solid #FF0000 !important; }
 .edit-btn { padding: 6px 12px; cursor: pointer; font-size: 11px; font-weight: bold; border: 1px solid #666; border-radius: 4px; background: #fff; margin-left: 5px; }
 .edit-btn:hover { background: #e0e0e0; }
@@ -5418,13 +5421,9 @@ function displayComparisonLine(lineNum, data) {
         if (rec && rec.dir === 'receive') {
             cell.textContent = 'SW-OFF';          // they gave this shift to you
             cell.classList.add('cmp-gave');
-            cell.style.background = '#95a5a6';
-            cell.style.color = '#fff';
         } else if (rec && rec.dir === 'give') {
             cell.textContent = 'SW-' + rec.shift; // you gave them your shift
             cell.classList.add('cmp-got');
-            cell.style.background = '#27ae60';
-            cell.style.color = '#fff';
         } else {
             cell.textContent = shift;
         }
