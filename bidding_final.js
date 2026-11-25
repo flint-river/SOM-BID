@@ -6111,85 +6111,139 @@ function xlZip(files) {
     return new Blob(parts.concat(central, [end]));
 }
 
-function excelFileName() {
-    return 'YourEdit_Line' + CURRENT_LINE + '_' + CURRENT_BID_YEAR + '-' + (CURRENT_BID_YEAR + 1) + '.xlsx';
+// ---- one line's year, colored like the main line on the page ----
+var XL_PROBE = null;
+function xlColorsFor(code) {
+    // Run the code through the page's own coloring so Excel matches the screen exactly
+    if (!XL_PROBE) {
+        var tbl = document.createElement('table');
+        tbl.className = 'year-table';
+        tbl.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;';
+        var tr = tbl.insertRow();
+        XL_PROBE = tr.insertCell();
+        XL_PROBE.className = 'shift-cell';
+        document.body.appendChild(tbl);
+    }
+    XL_PROBE.textContent = code;
+    updateCellColor(XL_PROBE);
+    var cs = getComputedStyle(XL_PROBE);
+    return { fill: xlHex(cs.backgroundColor, 'FFFFFFFF'), color: xlHex(cs.color, 'FF000000') };
 }
 
-function buildExcelWorkbook() {
-    var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    var cells = document.querySelectorAll('.shift-cell[data-date]');
-    var orig = originalState && originalState.cells ? originalState.cells : [];
-    var all = document.querySelectorAll('.shift-cell');
-    var origByDate = {};
-    for (var oi = 0; oi < all.length; oi++) { var od = all[oi].getAttribute('data-date'); if (od && orig[oi]) origByDate[od] = String(orig[oi].text).trim(); }
-    // holidays from the Summary tab
+function xlHolidays() {
     var holName = {};
     var hrows = document.querySelectorAll('[data-hdate]');
     for (var hi = 0; hi < hrows.length; hi++) {
         var tr = hrows[hi].closest('tr');
         holName[hrows[hi].getAttribute('data-hdate')] = tr && tr.cells[0] ? tr.cells[0].textContent.trim() : 'Holiday';
     }
-    // the partner shown on the page (if any)
-    var pRow = document.querySelector('.compare-row.visible');
-    var partnerKey = activePartner ? activePartner.lineKey : null;
-    var partnerLabel = null, partnerByDate = {};
-    if (pRow && partnerKey) {
-        var lab = pRow.querySelector('.month-label');
-        partnerLabel = lab ? lab.textContent.trim() : partnerKey;
-        var pcs = document.querySelectorAll('.compare-row.visible .compare-cell[data-date]');
-        for (var pi = 0; pi < pcs.length; pi++) partnerByDate[pcs[pi].getAttribute('data-date')] = pcs[pi];
-    }
-    function dParts(d) { var p = d.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
-    var byMonth = [], monthKey = {}, list = [];
+    return holName;
+}
+
+function xlDate(d) { var p = d.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+
+// What a partner's day looks like right now (swap > your change for them > their pattern)
+function partnerDayText(p, d) {
+    var rec = p.swaps ? p.swaps[d] : null;
+    if (rec && rec.dir === 'receive') return 'SW-OFF';
+    if (rec && rec.dir === 'give') return 'SW-' + rec.shift;
+    if (p.edits && p.edits[d] !== undefined) return p.edits[d];
+    return lineCodeOn(p.lineKey, d);
+}
+
+// Data for YOUR line, read from the page
+function excelDataMine() {
+    var holName = xlHolidays();
+    var cells = document.querySelectorAll('.shift-cell[data-date]');
+    var orig = originalState && originalState.cells ? originalState.cells : [];
+    var all = document.querySelectorAll('.shift-cell');
+    var origByDate = {};
+    for (var oi = 0; oi < all.length; oi++) { var od = all[oi].getAttribute('data-date'); if (od && orig[oi]) origByDate[od] = String(orig[oi].text).trim(); }
+    var list = [];
     for (var i = 0; i < cells.length; i++) {
-        var c = cells[i], d = c.getAttribute('data-date'), dt = dParts(d);
-        var mk = dt.getFullYear() + '-' + dt.getMonth();
-        if (monthKey[mk] === undefined) { monthKey[mk] = byMonth.length; byMonth.push({ y: dt.getFullYear(), m: dt.getMonth(), days: {} }); }
-        var cs = getComputedStyle(c);
-        var info = {
-            d: d, dt: dt, text: c.textContent.trim(),
+        var c = cells[i], d = c.getAttribute('data-date'), cs = getComputedStyle(c), text = c.textContent.trim();
+        list.push({
+            d: d, dt: xlDate(d), text: text, was: origByDate[d] !== undefined ? origByDate[d] : text,
             fill: xlHex(cs.backgroundColor, 'FFFFFFFF'), color: xlHex(cs.color, 'FF000000'),
             hol: !!holName[d] || c.classList.contains('holiday-cell'),
             ml: c.classList.contains('mylife') ? ((MY_LIFE[d] && MY_LIFE[d].l) || 'My Life date') : ''
-        };
-        byMonth[monthKey[mk]].days[dt.getDate()] = info;
-        list.push(info);
+        });
     }
+    var swapRows = swapPartners.map(function (p) {
+        var c = partnerCounts(p);
+        return { label: 'L' + p.displayNum + '-' + String(p.displayLabel.split('-')[1] || ''), received: c.receive, gave: c.give };
+    });
+    return {
+        lineLabel: 'Line ' + CURRENT_LINE, fileLine: CURRENT_LINE, holName: holName, list: list, hasMyLife: true,
+        swapRows: swapRows, note: 'This is your own plan from Your Edit. It does not change your real bid.'
+    };
+}
+
+// Data for a PARTNER's line, from the swaps and changes recorded with them
+function excelDataPartner(p) {
+    var holName = xlHolidays();
+    var cells = document.querySelectorAll('.shift-cell[data-date]');
+    var list = [];
+    for (var i = 0; i < cells.length; i++) {
+        var d = cells[i].getAttribute('data-date');
+        var text = partnerDayText(p, d), col = xlColorsFor(text);
+        list.push({ d: d, dt: xlDate(d), text: text, was: lineCodeOn(p.lineKey, d), fill: col.fill, color: col.color, hol: !!holName[d], ml: '' });
+    }
+    var c = partnerCounts(p);
+    return {
+        lineLabel: 'Line ' + p.displayLabel, fileLine: p.lineKey, holName: holName, list: list, hasMyLife: false,
+        swapRows: [{ label: 'L' + CURRENT_LINE, received: c.give, gave: c.receive }],   // their side of the swaps
+        note: 'Planned by Line ' + CURRENT_LINE + ' in Your Edit for swapping with L' + p.displayNum + '. It does not change anyone\\'s real bid.'
+    };
+}
+
+function excelFileNameFor(lineKey) {
+    return 'YourEdit_Line' + lineKey + '_' + CURRENT_BID_YEAR + '-' + (CURRENT_BID_YEAR + 1) + '.xlsx';
+}
+function excelFileName() { return excelFileNameFor(CURRENT_LINE); }
+
+// Build one workbook (Year View, Schedule, Summary) for one line
+function buildExcelFor(o) {
+    var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var HEART = String.fromCharCode(9829);
+    var holName = o.holName, list = o.list;
+    var byMonth = [], monthKey = {};
+    list.forEach(function (inf) {
+        var mk = inf.dt.getFullYear() + '-' + inf.dt.getMonth();
+        if (monthKey[mk] === undefined) { monthKey[mk] = byMonth.length; byMonth.push({ y: inf.dt.getFullYear(), m: inf.dt.getMonth(), days: {} }); }
+        byMonth[monthKey[mk]].days[inf.dt.getDate()] = inf;
+    });
     var wb = new XlBook();
-    var title = CURRENT_BID_YEAR + '/' + (CURRENT_BID_YEAR + 1) + ' Line ' + CURRENT_LINE + ' - Your Edit';
+    var title = CURRENT_BID_YEAR + '/' + (CURRENT_BID_YEAR + 1) + ' ' + o.lineLabel + ' - Your Edit';
     var hdr = { fill: 'FF87CEEB', bold: true, align: 'center', border: 'thin' };
     var lbl = { fill: 'FFE0E0E0', bold: true, align: 'center', border: 'thin' };
     var dow = { fill: 'FFF5F5F5', color: 'FF555555', size: 8, align: 'center', border: 'thin' };
-    var beige = { fill: 'FFFFE4B5', size: 9, align: 'center', border: 'thin' };
-    var pLbl = { fill: 'FFFF8C00', color: 'FFFFFFFF', bold: true, size: 9, align: 'center', border: 'thin' };
 
     // ---- Sheet 1: Year View (looks like the page) ----
     var rows = [], heights = {}, merges = [];
     rows.push([{ v: title, s: { bold: true, size: 14 } }]); merges.push('A1:AG1'); heights[0] = 22;
-    rows.push([{ v: 'Saved ' + new Date().toLocaleString() + (partnerLabel ? '   |   Swap partner: ' + partnerLabel : '') + '   |   Red border = holiday   |   ' + String.fromCharCode(9829) + ' = My Life date', s: { size: 9, color: 'FF555555' } }]); merges.push('A2:AG2');
+    rows.push([{ v: 'Saved ' + new Date().toLocaleString() + '   |   Red border = holiday' + (o.hasMyLife ? '   |   ' + HEART + ' = My Life date' : ''), s: { size: 9, color: 'FF555555' } }]); merges.push('A2:AG2');
     var head = [{ v: '', s: hdr }];
     for (var dn = 1; dn <= 31; dn++) head.push({ v: dn, s: hdr });
     head.push({ v: '', s: hdr });
     rows.push(head);
     byMonth.forEach(function (mo) {
         var name = MON[mo.m], last = new Date(mo.y, mo.m + 1, 0).getDate();
-        var r1 = [{ v: '', s: lbl }], r2 = [{ v: name, s: lbl }], r3 = partnerLabel ? [{ v: partnerLabel, s: pLbl }] : null;
+        var r1 = [{ v: '', s: lbl }], r2 = [{ v: name, s: lbl }];
         for (var day = 1; day <= 31; day++) {
             var inf = mo.days[day];
             if (day > last || !inf) {
                 var g = { fill: 'FFD3D3D3', border: 'thin' };
-                r1.push({ v: '', s: g }); r2.push({ v: '', s: g }); if (r3) r3.push({ v: '', s: g });
+                r1.push({ v: '', s: g }); r2.push({ v: '', s: g });
                 continue;
             }
             r1.push({ v: DOW[inf.dt.getDay()], s: dow });
-            r2.push({ v: inf.text + (inf.ml ? ' ' + String.fromCharCode(9829) : ''), s: { fill: inf.fill, color: inf.color, bold: true, size: 9, align: 'center', border: inf.hol ? 'red' : 'thin' } });
-            if (r3) { var pc = partnerByDate[inf.d]; r3.push({ v: pc ? pc.textContent.trim() : '', s: beige }); }
+            r2.push({ v: inf.text + (inf.ml ? ' ' + HEART : ''), s: { fill: inf.fill, color: inf.color, bold: true, size: 9, align: 'center', border: inf.hol ? 'red' : 'thin' } });
         }
-        r1.push({ v: '', s: lbl }); r2.push({ v: name, s: lbl }); if (r3) r3.push({ v: partnerLabel, s: pLbl });
+        r1.push({ v: '', s: lbl }); r2.push({ v: name, s: lbl });
         rows.push(r1); heights[rows.length - 1] = 12;
         rows.push(r2); heights[rows.length - 1] = 22;
-        if (r3) { rows.push(r3); heights[rows.length - 1] = 18; }
     });
     var widths = [8]; for (var w = 0; w < 31; w++) widths.push(8.5); widths.push(8);
     wb.addSheet('Year View', rows, { widths: widths, heights: heights, merges: merges, landscape: true });
@@ -6197,76 +6251,124 @@ function buildExcelWorkbook() {
     // ---- Sheet 2: Schedule (one row per day) ----
     var srows = [[
         { v: 'Date', s: hdr }, { v: 'Day', s: hdr }, { v: 'Shift', s: hdr }, { v: 'Pattern Shift', s: hdr },
-        { v: 'Changed', s: hdr }, { v: 'Holiday', s: hdr }, { v: 'My Life', s: hdr }
+        { v: 'Changed', s: hdr }, { v: 'Holiday', s: hdr }
     ]];
-    if (partnerLabel) srows[0].push({ v: partnerLabel + ' (partner)', s: hdr });
-    var workDays = 0, offDays = 0, changed = 0, holOff = 0, holTot = 0, mlCount = 0, mlOff = 0;
+    if (o.hasMyLife) srows[0].push({ v: 'My Life', s: hdr });
+    var workDays = 0, offDays = 0, changed = 0, holOff = 0, holTot = 0, mlCount = 0, mlOff = 0, patWork = 0;
     list.forEach(function (inf) {
-        var was = origByDate[inf.d] !== undefined ? origByDate[inf.d] : inf.text;
         var isOff = OFF_LIKE.indexOf(inf.text.toUpperCase()) !== -1;
         if (isOff) offDays++; else workDays++;
-        if (was !== inf.text) changed++;
+        if (OFF_LIKE.indexOf(String(inf.was).toUpperCase()) === -1) patWork++;
+        if (inf.was !== inf.text) changed++;
         if (holName[inf.d]) { holTot++; if (isOff) holOff++; }
         if (inf.ml) { mlCount++; if (isOff) mlOff++; }
-        var cell = { s: { border: 'thin' } };
         var row = [
             { v: (inf.dt.getMonth() + 1) + '/' + inf.dt.getDate() + '/' + inf.dt.getFullYear(), s: { border: 'thin', align: 'center' } },
             { v: DOW[inf.dt.getDay()], s: { border: 'thin', align: 'center' } },
             { v: inf.text, s: { fill: inf.fill, color: inf.color, bold: true, align: 'center', border: inf.hol ? 'red' : 'thin' } },
-            { v: was, s: { border: 'thin', align: 'center', color: 'FF777777' } },
-            { v: was !== inf.text ? 'Yes' : '', s: { border: 'thin', align: 'center', bold: true, color: 'FF0000CC' } },
-            { v: holName[inf.d] || '', s: cell.s },
-            { v: inf.ml ? String.fromCharCode(9829) + ' ' + inf.ml : '', s: { border: 'thin', color: 'FFD81B60' } }
+            { v: inf.was, s: { border: 'thin', align: 'center', color: 'FF777777' } },
+            { v: inf.was !== inf.text ? 'Yes' : '', s: { border: 'thin', align: 'center', bold: true, color: 'FF0000CC' } },
+            { v: holName[inf.d] || '', s: { border: 'thin' } }
         ];
-        if (partnerLabel) { var pc = partnerByDate[inf.d]; row.push({ v: pc ? pc.textContent.trim() : '', s: { fill: 'FFFFE4B5', border: 'thin', align: 'center' } }); }
+        if (o.hasMyLife) row.push({ v: inf.ml ? HEART + ' ' + inf.ml : '', s: { border: 'thin', color: 'FFD81B60' } });
         srows.push(row);
     });
-    wb.addSheet('Schedule', srows, { widths: partnerLabel ? [12, 6, 12, 13, 9, 24, 28, 18] : [12, 6, 12, 13, 9, 24, 28], freezeRow: 1 });
+    wb.addSheet('Schedule', srows, { widths: o.hasMyLife ? [12, 6, 12, 13, 9, 24, 28] : [12, 6, 12, 13, 9, 24], freezeRow: 1 });
 
     // ---- Sheet 3: Summary ----
-    var patWork = 0;
-    list.forEach(function (inf) { var was = origByDate[inf.d] !== undefined ? origByDate[inf.d] : inf.text; if (OFF_LIKE.indexOf(was.toUpperCase()) === -1) patWork++; });
     var k = { bold: true, border: 'thin', fill: 'FFF0F0F0' }, v = { border: 'thin', align: 'center' };
     var sum = [
         [{ v: title, s: { bold: true, size: 14 } }],
         [],
         [{ v: 'Work days in the line pattern', s: k }, { v: patWork, s: v }],
-        [{ v: 'Work days now (after your changes)', s: k }, { v: workDays, s: v }],
+        [{ v: 'Work days now (after changes)', s: k }, { v: workDays, s: v }],
         [{ v: 'Days off now (incl. VAC, PPT, PTD, HOL, swaps off)', s: k }, { v: offDays, s: v }],
         [{ v: 'Holidays off', s: k }, { v: holOff + ' of ' + holTot, s: v }],
-        [{ v: 'Days changed from the pattern', s: k }, { v: changed, s: v }],
-        [{ v: 'My Life dates', s: k }, { v: mlCount ? (mlOff + ' of ' + mlCount + ' off') : 'none', s: v }],
-        []
+        [{ v: 'Days changed from the pattern', s: k }, { v: changed, s: v }]
     ];
-    if (swapPartners.length) {
-        sum.push([{ v: 'Swap partner', s: hdr }, { v: 'You received', s: hdr }, { v: 'You gave', s: hdr }, { v: 'Balance', s: hdr }]);
-        swapPartners.forEach(function (p) {
-            var rec = 0, gave = 0;
-            Object.keys(p.swaps || {}).forEach(function (x) { if (p.swaps[x].dir === 'receive') rec++; else gave++; });
-            var bal = rec - gave;
-            sum.push([{ v: (p.lineKey === partnerKey && partnerLabel) ? partnerLabel : p.lineKey, s: { border: 'thin', bold: true } }, { v: rec, s: v }, { v: gave, s: v },
+    if (o.hasMyLife) sum.push([{ v: 'My Life dates', s: k }, { v: mlCount ? (mlOff + ' of ' + mlCount + ' off') : 'none', s: v }]);
+    sum.push([]);
+    if (o.swapRows && o.swapRows.length) {
+        sum.push([{ v: 'Swap partner', s: hdr }, { v: 'Received', s: hdr }, { v: 'Gave', s: hdr }, { v: 'Balance', s: hdr }]);
+        o.swapRows.forEach(function (r) {
+            var bal = r.received - r.gave;
+            sum.push([{ v: r.label, s: { border: 'thin', bold: true } }, { v: r.received, s: v }, { v: r.gave, s: v },
                 { v: (bal > 0 ? '+' : '') + bal, s: { border: 'thin', align: 'center', bold: true, color: bal === 0 ? 'FF15803D' : 'FFB91C1C' } }]);
         });
         sum.push([]);
     }
-    sum.push([{ v: 'This is your own plan from Your Edit. It does not change your real bid.', s: { size: 9, color: 'FF777777' } }]);
+    sum.push([{ v: o.note, s: { size: 9, color: 'FF777777' } }]);
     wb.addSheet('Summary', sum, { widths: [44, 14, 12, 12] });
     return wb;
 }
 
-function saveExcel() {
+// Kept for anything that still calls it: your line only
+function buildExcelWorkbook() { return buildExcelFor(excelDataMine()); }
+
+function downloadBlob(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+
+// Download the chosen lines, one file each (spaced out so the browser takes them all)
+function exportExcelLines(keys) {
+    var jobs = [];
+    keys.forEach(function (key) {
+        if (key === CURRENT_LINE) { jobs.push({ name: excelFileName(), data: function () { return excelDataMine(); } }); return; }
+        for (var i = 0; i < swapPartners.length; i++) if (swapPartners[i].lineKey === key) {
+            (function (p) { jobs.push({ name: excelFileNameFor(p.lineKey), data: function () { return excelDataPartner(p); } }); })(swapPartners[i]);
+        }
+    });
+    if (!jobs.length) return;
     try {
-        var blob = buildExcelWorkbook().toBlob();
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = excelFileName();
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-        showPlanToast('Saved ' + excelFileName() + ' for Excel. To reopen your plan in Your Edit later, use SAVE / OPEN (the plan file).');
+        var made = jobs.map(function (j) { return { name: j.name, blob: buildExcelFor(j.data()).toBlob() }; });
+        made.forEach(function (m, n) { setTimeout(function () { downloadBlob(m.blob, m.name); }, n * 700); });
+        showPlanToast(made.length === 1
+            ? 'Saved ' + made[0].name + ' for Excel. To reopen your plan in Your Edit later, use SAVE / OPEN (the plan file).'
+            : 'Saved ' + made.length + ' Excel files: ' + made.map(function (m) { return m.name; }).join(', ') + '. If your browser asks, allow multiple downloads.');
     } catch (e) {
         showPlanToast('Could not make the Excel file: ' + e.message, true);
     }
+}
+
+function saveExcel() {
+    if (!swapPartners.length) { exportExcelLines([CURRENT_LINE]); return; }
+    var old = document.getElementById('excelPickOverlay');
+    if (old) old.remove();
+    var ov = document.createElement('div');
+    ov.id = 'excelPickOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;';
+    var rowsHtml = '<label style="display:flex;align-items:center;gap:8px;background:#16213e;border:1px solid #333;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:14px;"><input type="checkbox" value="' + CURRENT_LINE + '" checked> <b>My line</b> &nbsp;L' + CURRENT_LINE + '</label>';
+    swapPartners.forEach(function (p) {
+        rowsHtml += '<label style="display:flex;align-items:center;gap:8px;background:#16213e;border:1px solid #333;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:14px;"><input type="checkbox" value="' + p.lineKey + '"> Partner &nbsp;<b>L' + p.displayLabel + '</b></label>';
+    });
+    ov.innerHTML = '<div style="background:#1a1a2e;color:#eee;border:2px solid #107c41;border-radius:10px;padding:18px 22px;min-width:320px;max-width:460px;font-family:Arial,sans-serif;">' +
+        '<h3 style="margin:0 0 6px;color:#4ade80;">📊 Save to Excel</h3>' +
+        '<div style="font-size:12px;color:#bbb;margin-bottom:12px;">Pick the lines you want. Each line downloads as its own Excel file, in the normal colors.</div>' +
+        '<div id="xlPickList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">' + rowsHtml + '</div>' +
+        '<div style="font-size:12px;margin-bottom:14px;"><a href="#" id="xlAll" style="color:#93c5fd;">Select all</a> &nbsp;|&nbsp; <a href="#" id="xlNone" style="color:#93c5fd;">Clear</a></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button id="xlCancel" style="padding:8px 14px;background:#555;color:#fff;border:none;border-radius:5px;cursor:pointer;">Cancel</button>' +
+        '<button id="xlGo" style="padding:8px 16px;background:#107c41;color:#fff;font-weight:bold;border:none;border-radius:5px;cursor:pointer;">Download</button>' +
+        '</div></div>';
+    document.body.appendChild(ov);
+    var boxes = ov.querySelectorAll('#xlPickList input');
+    function setAll(v) { for (var i = 0; i < boxes.length; i++) boxes[i].checked = v; }
+    ov.querySelector('#xlAll').onclick = function (e) { e.preventDefault(); setAll(true); };
+    ov.querySelector('#xlNone').onclick = function (e) { e.preventDefault(); setAll(false); };
+    ov.querySelector('#xlCancel').onclick = function () { ov.remove(); };
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+    ov.querySelector('#xlGo').onclick = function () {
+        var keys = [];
+        for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) keys.push(boxes[i].value);
+        if (!keys.length) { alert('Check at least one line.'); return; }
+        ov.remove();
+        exportExcelLines(keys);
+    };
 }
 
 function openPlanPicker() {
