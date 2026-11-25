@@ -3898,6 +3898,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .drag-item.vac { background: #FF69B4; color: #000; }
 .drag-item.hol { background: #FFD700; color: #000; }
 .drag-item.ppt { background: #9370DB; color: #fff; }
+.drag-item.ptd { background: #D2B48C; color: #000; }
 .drag-item.off { background: #00FF00; color: #000; }
 .drag-item.special { background: #FF4500; color: #fff; }
 .drag-item.training { background: #4169E1; color: #fff; }
@@ -3908,6 +3909,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 .shift-cell.vac { background: #FF69B4 !important; }
 .shift-cell.hol { background: #FFD700 !important; }
 .shift-cell.ppt { background: #9370DB !important; color: #fff; }
+.shift-cell.ptd { background: #D2B48C !important; color: #000; }
 .shift-cell.special { background: #FF4500 !important; color: #fff; }
 .shift-cell.training { background: #4169E1 !important; color: #fff; }
 /* Swapped days keep the normal colors (the SW- text marks the swap): SW-shift = work color, SW-OFF = off-day green */
@@ -3959,6 +3961,7 @@ body.subtle-colors .off, body.subtle-colors .schedule-table .off, body.subtle-co
 body.subtle-colors .shift-cell.vac, body.subtle-colors .drag-item.vac { background: #F0C8D8 !important; }
 body.subtle-colors .shift-cell.hol, body.subtle-colors .drag-item.hol { background: #F5E8C0 !important; }
 body.subtle-colors .shift-cell.ppt, body.subtle-colors .drag-item.ppt { background: #D8D0E8 !important; color: #333 !important; }
+body.subtle-colors .shift-cell.ptd, body.subtle-colors .drag-item.ptd { background: #EDE3D3 !important; color: #333 !important; }
 body.subtle-colors .shift-cell.special, body.subtle-colors .drag-item.special { background: #F5D0C0 !important; color: #333 !important; }
 body.subtle-colors .shift-cell.training, body.subtle-colors .drag-item.training { background: #E0E0B0 !important; color: #333 !important; }
 body.subtle-colors .drag-item.swap { background: #D0E8F0 !important; }
@@ -4107,6 +4110,7 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
         <div class="drag-item vac" draggable="true" data-value="VAC" data-type="timeoff">VAC</div>
         <div class="drag-item hol" draggable="true" data-value="HOL" data-type="timeoff">HOL</div>
         <div class="drag-item ppt" draggable="true" data-value="PPT" data-type="timeoff">PPT</div>
+        <div class="drag-item ptd" draggable="true" data-value="PTD" data-type="timeoff" title="Paid Trade Day">PTD</div>
         <div class="drag-item off" draggable="true" data-value="--" data-type="timeoff">OFF</div>
         <div class="drag-item swapoff" draggable="true" data-value="SW-OFF" data-type="timeoff">SWAP OFF</div>
         <div class="drag-item compoff" draggable="true" data-value="COMP-OFF" data-type="timeoff">COMP OFF</div>
@@ -4220,7 +4224,7 @@ ${shiftPaletteHTML}    <div class="drag-palette no-print" style="background:#e8e
 <script>
 // ---- Build My Life days (brought in from the bid page when this editor was opened) ----
 var MY_LIFE = ${myLifeJSON};
-var MY_LIFE_OFF = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
+var MY_LIFE_OFF = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'PTD', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
 var myLifeConflicts = [];
 
 function myLifeNice(dateStr) {
@@ -4272,7 +4276,7 @@ function showMyLifePanel(offCount) {
         });
         html += '</table>' +
             '<div class="row"><b>Fill these work days with:</b> ' +
-            '<select id="myLifeFillCode"><option value="VAC">VAC</option><option value="PPT">PPT</option><option value="HOL">HOL</option><option value="OFF">OFF</option><option value="SW-OFF">SWAP OFF</option><option value="COMP-OFF">COMP OFF</option></select> ' +
+            '<select id="myLifeFillCode"><option value="VAC">VAC</option><option value="PPT">PPT</option><option value="PTD">PTD</option><option value="HOL">HOL</option><option value="OFF">OFF</option><option value="SW-OFF">SWAP OFF</option><option value="COMP-OFF">COMP OFF</option></select> ' +
             '<select id="myLifeFillWhich"><option value="all">all of them</option><option value="must">Must Have Off only</option></select></div>' +
             '<div class="row"><button onclick="fillMyLifeConflicts()" style="background:#db2777; color:#fff;">Fill work days</button> ' +
             '<button onclick="closeMyLifePanel()" style="background:#e5e7eb;">Just mark them</button></div>';
@@ -4443,7 +4447,7 @@ function resetToOriginal() {
 
 // Summary and Schedule tabs are rebuilt from the Year Overview, so they show your edits and swaps
 function syncSideTabs() {
-    var offLike = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
+    var offLike = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'PTD', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
     var byDate = {};
     var cells = document.querySelectorAll('#yearview .shift-cell[data-date]');
     var work = 0;
@@ -4634,7 +4638,7 @@ function downloadAsHTML() {
 // Helper to update cell color based on content
 function updateCellColor(cell) {
     var val = cell.textContent.trim().toUpperCase();
-    cell.classList.remove('work', 'off', 'vac', 'hol', 'ppt', 'special', 'training', 'swap', 'swapoff', 'compoff', 'compwork', 'ot', 'dt');
+    cell.classList.remove('work', 'off', 'vac', 'hol', 'ppt', 'ptd', 'special', 'training', 'swap', 'swapoff', 'compoff', 'compwork', 'ot', 'dt');
     if (val === '--' || val === '') {
         cell.classList.add('off');
     } else if (val === 'VAC') {
@@ -4643,6 +4647,8 @@ function updateCellColor(cell) {
         cell.classList.add('hol');
     } else if (val === 'PPT') {
         cell.classList.add('ppt');
+    } else if (val === 'PTD') {
+        cell.classList.add('ptd');
     } else if (val === 'SPEC' || val === 'SPECIAL' || val === 'C-SPEC') {
         cell.classList.add('special');
     } else if (val === 'TRN' || val === 'TRAINING' || val === 'C-TRN') {
@@ -4659,6 +4665,8 @@ function updateCellColor(cell) {
         cell.classList.add('swap');
     } else if (val.startsWith('OT-')) {
         cell.classList.add('ot');
+    } else if (val.startsWith('PTD-')) {
+        cell.classList.add('ptd');
     } else if (val.startsWith('DT-')) {
         cell.classList.add('dt');
     } else {
@@ -4976,11 +4984,12 @@ for (var sc = 0; sc < shiftCells.length; sc++) {
 
         var newText = value;
         if (type === 'shift') {
-            var shiftChoice = prompt('Is this shift a:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n\\nEnter 1, 2, 3, or 4:');
+            var shiftChoice = prompt('Is this shift a:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n5 = PTD (Paid Trade Day)\\n\\nEnter 1, 2, 3, 4, or 5:');
             if (shiftChoice === null) return;   // Cancel = no change
             if (shiftChoice === '2') newText = 'SW-' + value;
             else if (shiftChoice === '3') newText = 'OT-' + value;
             else if (shiftChoice === '4') newText = 'DT-' + value;
+            else if (shiftChoice === '5') newText = 'PTD-' + value;
         } else if (type === 'special') {
             var specChoice = prompt(value + ' - Is this:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
             if (specChoice === null) return;    // Cancel = no change
@@ -5312,7 +5321,7 @@ function partnerCounts(p) {
 }
 
 // ---------- Swap engine: every swap is recorded so it can be undone or dragged back ----------
-var OFF_LIKE = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
+var OFF_LIKE = ['--', '', 'OFF', 'VAC', 'HOL', 'PPT', 'PTD', 'SW-OFF', 'SWAP-OFF', 'COMP-OFF'];
 
 function clearDragState() {
     draggedValue = null;
@@ -5761,11 +5770,12 @@ document.addEventListener('mousedown', function(e) {
     }
     var newText = quickApplyValue;
     if (quickApplyType === 'shift') {
-        var choice = prompt('Is this shift a:\\n1 = Regular\\n2 = SWAP\\n3 = OT\\n4 = DT\\n\\nEnter 1-4:');
+        var choice = prompt('Is this shift a:\\n1 = Regular\\n2 = SWAP\\n3 = OT\\n4 = DT\\n5 = PTD (Paid Trade Day)\\n\\nEnter 1-5:');
         if (choice === null) return;   // Cancel = no change
         if (choice === '2') newText = 'SW-' + quickApplyValue;
         else if (choice === '3') newText = 'OT-' + quickApplyValue;
         else if (choice === '4') newText = 'DT-' + quickApplyValue;
+        else if (choice === '5') newText = 'PTD-' + quickApplyValue;
     } else if (quickApplyType === 'special') {
         var specChoice = prompt(quickApplyValue + ' - Is this:\\n1 = COMP\\n2 = OT\\n\\nEnter 1 or 2:');
         if (specChoice === null) return;   // Cancel = no change
@@ -6089,7 +6099,7 @@ function buildExcelWorkbook() {
         [],
         [{ v: 'Work days in the line pattern', s: k }, { v: patWork, s: v }],
         [{ v: 'Work days now (after your changes)', s: k }, { v: workDays, s: v }],
-        [{ v: 'Days off now (incl. VAC, PPT, HOL, swaps off)', s: k }, { v: offDays, s: v }],
+        [{ v: 'Days off now (incl. VAC, PPT, PTD, HOL, swaps off)', s: k }, { v: offDays, s: v }],
         [{ v: 'Holidays off', s: k }, { v: holOff + ' of ' + holTot, s: v }],
         [{ v: 'Days changed from the pattern', s: k }, { v: changed, s: v }],
         [{ v: 'My Life dates', s: k }, { v: mlCount ? (mlOff + ' of ' + mlCount + ' off') : 'none', s: v }],
