@@ -3978,6 +3978,7 @@ body.subtle-colors .line-dropdown-option .pattern-day.work { background: #F5E0B0
     <button onclick="goBackToMain()" style="background:#6c757d; color:white; font-weight:bold;">&#8592; Back to Main Bid Page</button>
     <button onclick="savePlan()" title="Download your plan as a file you can open again later (Ctrl+S)" style="background:#28a745; color:white; font-weight:bold; margin-left:10px;">💾 SAVE</button>
     <button onclick="openPlanPicker()" title="Load a plan file you saved before" style="background:#2563eb; color:white; font-weight:bold; margin-left:6px;">📂 OPEN</button>
+    <button onclick="saveExcel()" title="Download this year as an Excel file (.xlsx) to view, print or share. To reopen your plan here later, use SAVE / OPEN." style="background:#107c41; color:white; font-weight:bold; margin-left:6px;">📊 EXCEL</button>
     <input type="file" id="planFileInput" accept=".json,application/json" style="display:none" onchange="onPlanFileChosen(this)">
     <span style="margin-left:15px; border-left:2px solid #ccc; padding-left:15px; display:flex; align-items:center; gap:8px;">
         <label style="font-weight:bold; color:#333;">Switch Line:</label>
@@ -5840,6 +5841,289 @@ function savePlan() {
     var n = Object.keys(plan.days).length, s = 0;
     plan.partners.forEach(function (p) { s += Object.keys(p.swaps).length; });
     showPlanToast('Saved ' + planFileName() + ' (' + n + ' changed ' + (n === 1 ? 'day' : 'days') + ', ' + s + ' ' + (s === 1 ? 'swap' : 'swaps') + '). Use OPEN to load it later.');
+}
+
+// ===== Save to Excel (.xlsx) - built in, no library needed =====
+function xlEsc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function xlHex(rgb, dflt) {
+    var m = /rgba?[(](\\d+)[, ]+(\\d+)[, ]+(\\d+)(?:[, ]+([0-9.]+))?/.exec(rgb || '');
+    if (!m || (m[4] !== undefined && parseFloat(m[4]) === 0)) return dflt;
+    function h(n) { var s = (+n).toString(16).toUpperCase(); return s.length < 2 ? '0' + s : s; }
+    return 'FF' + h(m[1]) + h(m[2]) + h(m[3]);
+}
+function xlCol(n) { var s = ''; n++; while (n > 0) { var r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; }
+
+function XlBook() {
+    this.sheets = [];
+    this.fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
+    this.fonts = ['<font><sz val="10"/><name val="Arial"/></font>'];
+    this.borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>'];
+    this.xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'];
+    this.styleMap = {};
+}
+// st: {fill:'FFRRGGBB', bold:true, color:'FFRRGGBB', size:10, border:'thin'|'red', align:'center', wrap:true}
+XlBook.prototype.style = function (st) {
+    if (!st) return 0;
+    var key = JSON.stringify(st);
+    if (this.styleMap[key] !== undefined) return this.styleMap[key];
+    var fillId = 0, fontId = 0, borderId = 0;
+    if (st.fill) { this.fills.push('<fill><patternFill patternType="solid"><fgColor rgb="' + st.fill + '"/><bgColor indexed="64"/></patternFill></fill>'); fillId = this.fills.length - 1; }
+    if (st.bold || st.color || st.size) {
+        this.fonts.push('<font>' + (st.bold ? '<b/>' : '') + '<sz val="' + (st.size || 10) + '"/>' + (st.color ? '<color rgb="' + st.color + '"/>' : '') + '<name val="Arial"/></font>');
+        fontId = this.fonts.length - 1;
+    }
+    if (st.border) {
+        var red = st.border === 'red', s = red ? 'medium' : 'thin', c = red ? 'FFFF0000' : 'FFBFBFBF';
+        var one = function (n) { return '<' + n + ' style="' + s + '"><color rgb="' + c + '"/></' + n + '>'; };
+        this.borders.push('<border>' + one('left') + one('right') + one('top') + one('bottom') + '<diagonal/></border>');
+        borderId = this.borders.length - 1;
+    }
+    var align = (st.align || st.wrap) ? '<alignment' + (st.align ? ' horizontal="' + st.align + '" vertical="center"' : '') + (st.wrap ? ' wrapText="1"' : '') + '/>' : '';
+    this.xfs.push('<xf numFmtId="0" fontId="' + fontId + '" fillId="' + fillId + '" borderId="' + borderId + '" xfId="0"' +
+        (fillId ? ' applyFill="1"' : '') + (fontId ? ' applyFont="1"' : '') + (borderId ? ' applyBorder="1"' : '') + (align ? ' applyAlignment="1">' + align + '</xf>' : '/>'));
+    this.styleMap[key] = this.xfs.length - 1;
+    return this.styleMap[key];
+};
+// rows: array of arrays of cells; a cell is a value or {v:value, s:style}
+XlBook.prototype.addSheet = function (name, rows, opts) {
+    opts = opts || {};
+    var self = this, xml = [];
+    rows.forEach(function (row, r) {
+        if (!row) return;
+        var cells = [];
+        row.forEach(function (cell, c) {
+            if (cell === null || cell === undefined) return;
+            var v = (typeof cell === 'object') ? cell.v : cell, s = (typeof cell === 'object') ? self.style(cell.s) : 0;
+            var ref = xlCol(c) + (r + 1);
+            if (typeof v === 'number' && isFinite(v)) cells.push('<c r="' + ref + '" s="' + s + '"><v>' + v + '</v></c>');
+            else if (v === '' || v === null || v === undefined) cells.push('<c r="' + ref + '" s="' + s + '"/>');
+            else cells.push('<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t xml:space="preserve">' + xlEsc(v) + '</t></is></c>');
+        });
+        var ht = opts.heights && opts.heights[r] ? ' ht="' + opts.heights[r] + '" customHeight="1"' : '';
+        xml.push('<row r="' + (r + 1) + '"' + ht + '>' + cells.join('') + '</row>');
+    });
+    var cols = (opts.widths || []).map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join('');
+    var pane = opts.freezeRow ? '<sheetViews><sheetView workbookViewId="0"><pane ySplit="' + opts.freezeRow + '" topLeftCell="A' + (opts.freezeRow + 1) + '" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' : '';
+    var merges = (opts.merges && opts.merges.length) ? '<mergeCells count="' + opts.merges.length + '">' + opts.merges.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join('') + '</mergeCells>' : '';
+    var setup = opts.landscape ? '<pageMargins left="0.25" right="0.25" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>' : '';
+    var fit = opts.landscape ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '';
+    this.sheets.push({
+        name: name.replace(/[:\\\\/?*\\[\\]]/g, ' ').slice(0, 31),
+        xml: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+            fit + pane + (cols ? '<cols>' + cols + '</cols>' : '') + '<sheetData>' + xml.join('') + '</sheetData>' + merges + setup + '</worksheet>'
+    });
+};
+XlBook.prototype.toBlob = function () {
+    var H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    var files = [];
+    var ct = H + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+    var wbSheets = '', wbRels = '';
+    this.sheets.forEach(function (s, i) {
+        ct += '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+        wbSheets += '<sheet name="' + xlEsc(s.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>';
+        wbRels += '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>';
+        files.push(['xl/worksheets/sheet' + (i + 1) + '.xml', s.xml]);
+    });
+    ct += '</Types>';
+    var n = this.sheets.length;
+    wbRels += '<Relationship Id="rId' + (n + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
+    files.unshift(['[Content_Types].xml', ct],
+        ['_rels/.rels', H + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+        ['xl/workbook.xml', H + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + wbSheets + '</sheets></workbook>'],
+        ['xl/_rels/workbook.xml.rels', H + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + wbRels + '</Relationships>'],
+        ['xl/styles.xml', H + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+            '<fonts count="' + this.fonts.length + '">' + this.fonts.join('') + '</fonts>' +
+            '<fills count="' + this.fills.length + '">' + this.fills.join('') + '</fills>' +
+            '<borders count="' + this.borders.length + '">' + this.borders.join('') + '</borders>' +
+            '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+            '<cellXfs count="' + this.xfs.length + '">' + this.xfs.join('') + '</cellXfs>' +
+            '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>']);
+    return new Blob([xlZip(files)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+};
+var XL_CRC = null;
+function xlCrc(bytes) {
+    if (!XL_CRC) { XL_CRC = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); XL_CRC[n] = c >>> 0; } }
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) crc = XL_CRC[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+// Minimal ZIP writer (stored, no compression) - all Excel needs
+function xlZip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0;
+    function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+    function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+    files.forEach(function (f) {
+        var name = enc.encode(f[0]), data = enc.encode(f[1]), crc = xlCrc(data);
+        var common = [].concat(u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(crc), u32(data.length), u32(data.length), u16(name.length));
+        var local = new Uint8Array([].concat(u32(0x04034b50), common, u16(0)));
+        parts.push(local, name, data);
+        central.push(new Uint8Array([].concat(u32(0x02014b50), u16(20), common, u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset))), name);
+        offset += local.length + name.length + data.length;
+    });
+    var cdSize = 0; central.forEach(function (c) { cdSize += c.length; });
+    var end = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(cdSize), u32(offset), u16(0)));
+    return new Blob(parts.concat(central, [end]));
+}
+
+function excelFileName() {
+    return 'YourEdit_Line' + CURRENT_LINE + '_' + CURRENT_BID_YEAR + '-' + (CURRENT_BID_YEAR + 1) + '.xlsx';
+}
+
+function buildExcelWorkbook() {
+    var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var cells = document.querySelectorAll('.shift-cell[data-date]');
+    var orig = originalState && originalState.cells ? originalState.cells : [];
+    var all = document.querySelectorAll('.shift-cell');
+    var origByDate = {};
+    for (var oi = 0; oi < all.length; oi++) { var od = all[oi].getAttribute('data-date'); if (od && orig[oi]) origByDate[od] = String(orig[oi].text).trim(); }
+    // holidays from the Summary tab
+    var holName = {};
+    var hrows = document.querySelectorAll('[data-hdate]');
+    for (var hi = 0; hi < hrows.length; hi++) {
+        var tr = hrows[hi].closest('tr');
+        holName[hrows[hi].getAttribute('data-hdate')] = tr && tr.cells[0] ? tr.cells[0].textContent.trim() : 'Holiday';
+    }
+    // the partner shown on the page (if any)
+    var pRow = document.querySelector('.compare-row.visible');
+    var partnerKey = activePartner ? activePartner.lineKey : null;
+    var partnerLabel = null, partnerByDate = {};
+    if (pRow && partnerKey) {
+        var lab = pRow.querySelector('.month-label');
+        partnerLabel = lab ? lab.textContent.trim() : partnerKey;
+        var pcs = document.querySelectorAll('.compare-row.visible .compare-cell[data-date]');
+        for (var pi = 0; pi < pcs.length; pi++) partnerByDate[pcs[pi].getAttribute('data-date')] = pcs[pi];
+    }
+    function dParts(d) { var p = d.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+    var byMonth = [], monthKey = {}, list = [];
+    for (var i = 0; i < cells.length; i++) {
+        var c = cells[i], d = c.getAttribute('data-date'), dt = dParts(d);
+        var mk = dt.getFullYear() + '-' + dt.getMonth();
+        if (monthKey[mk] === undefined) { monthKey[mk] = byMonth.length; byMonth.push({ y: dt.getFullYear(), m: dt.getMonth(), days: {} }); }
+        var cs = getComputedStyle(c);
+        var info = {
+            d: d, dt: dt, text: c.textContent.trim(),
+            fill: xlHex(cs.backgroundColor, 'FFFFFFFF'), color: xlHex(cs.color, 'FF000000'),
+            hol: !!holName[d] || c.classList.contains('holiday-cell'),
+            ml: c.classList.contains('mylife') ? ((MY_LIFE[d] && MY_LIFE[d].l) || 'My Life date') : ''
+        };
+        byMonth[monthKey[mk]].days[dt.getDate()] = info;
+        list.push(info);
+    }
+    var wb = new XlBook();
+    var title = CURRENT_BID_YEAR + '/' + (CURRENT_BID_YEAR + 1) + ' Line ' + CURRENT_LINE + ' - Your Edit';
+    var hdr = { fill: 'FF87CEEB', bold: true, align: 'center', border: 'thin' };
+    var lbl = { fill: 'FFE0E0E0', bold: true, align: 'center', border: 'thin' };
+    var dow = { fill: 'FFF5F5F5', color: 'FF555555', size: 8, align: 'center', border: 'thin' };
+    var beige = { fill: 'FFFFE4B5', size: 9, align: 'center', border: 'thin' };
+    var pLbl = { fill: 'FFFF8C00', color: 'FFFFFFFF', bold: true, size: 9, align: 'center', border: 'thin' };
+
+    // ---- Sheet 1: Year View (looks like the page) ----
+    var rows = [], heights = {}, merges = [];
+    rows.push([{ v: title, s: { bold: true, size: 14 } }]); merges.push('A1:AG1'); heights[0] = 22;
+    rows.push([{ v: 'Saved ' + new Date().toLocaleString() + (partnerLabel ? '   |   Swap partner: ' + partnerLabel : '') + '   |   Red border = holiday   |   ' + String.fromCharCode(9829) + ' = My Life date', s: { size: 9, color: 'FF555555' } }]); merges.push('A2:AG2');
+    var head = [{ v: '', s: hdr }];
+    for (var dn = 1; dn <= 31; dn++) head.push({ v: dn, s: hdr });
+    head.push({ v: '', s: hdr });
+    rows.push(head);
+    byMonth.forEach(function (mo) {
+        var name = MON[mo.m], last = new Date(mo.y, mo.m + 1, 0).getDate();
+        var r1 = [{ v: '', s: lbl }], r2 = [{ v: name, s: lbl }], r3 = partnerLabel ? [{ v: partnerLabel, s: pLbl }] : null;
+        for (var day = 1; day <= 31; day++) {
+            var inf = mo.days[day];
+            if (day > last || !inf) {
+                var g = { fill: 'FFD3D3D3', border: 'thin' };
+                r1.push({ v: '', s: g }); r2.push({ v: '', s: g }); if (r3) r3.push({ v: '', s: g });
+                continue;
+            }
+            r1.push({ v: DOW[inf.dt.getDay()], s: dow });
+            r2.push({ v: inf.text + (inf.ml ? ' ' + String.fromCharCode(9829) : ''), s: { fill: inf.fill, color: inf.color, bold: true, size: 9, align: 'center', border: inf.hol ? 'red' : 'thin' } });
+            if (r3) { var pc = partnerByDate[inf.d]; r3.push({ v: pc ? pc.textContent.trim() : '', s: beige }); }
+        }
+        r1.push({ v: '', s: lbl }); r2.push({ v: name, s: lbl }); if (r3) r3.push({ v: partnerLabel, s: pLbl });
+        rows.push(r1); heights[rows.length - 1] = 12;
+        rows.push(r2); heights[rows.length - 1] = 22;
+        if (r3) { rows.push(r3); heights[rows.length - 1] = 18; }
+    });
+    var widths = [8]; for (var w = 0; w < 31; w++) widths.push(8.5); widths.push(8);
+    wb.addSheet('Year View', rows, { widths: widths, heights: heights, merges: merges, landscape: true });
+
+    // ---- Sheet 2: Schedule (one row per day) ----
+    var srows = [[
+        { v: 'Date', s: hdr }, { v: 'Day', s: hdr }, { v: 'Shift', s: hdr }, { v: 'Pattern Shift', s: hdr },
+        { v: 'Changed', s: hdr }, { v: 'Holiday', s: hdr }, { v: 'My Life', s: hdr }
+    ]];
+    if (partnerLabel) srows[0].push({ v: partnerLabel + ' (partner)', s: hdr });
+    var workDays = 0, offDays = 0, changed = 0, holOff = 0, holTot = 0, mlCount = 0, mlOff = 0;
+    list.forEach(function (inf) {
+        var was = origByDate[inf.d] !== undefined ? origByDate[inf.d] : inf.text;
+        var isOff = OFF_LIKE.indexOf(inf.text.toUpperCase()) !== -1;
+        if (isOff) offDays++; else workDays++;
+        if (was !== inf.text) changed++;
+        if (holName[inf.d]) { holTot++; if (isOff) holOff++; }
+        if (inf.ml) { mlCount++; if (isOff) mlOff++; }
+        var cell = { s: { border: 'thin' } };
+        var row = [
+            { v: (inf.dt.getMonth() + 1) + '/' + inf.dt.getDate() + '/' + inf.dt.getFullYear(), s: { border: 'thin', align: 'center' } },
+            { v: DOW[inf.dt.getDay()], s: { border: 'thin', align: 'center' } },
+            { v: inf.text, s: { fill: inf.fill, color: inf.color, bold: true, align: 'center', border: inf.hol ? 'red' : 'thin' } },
+            { v: was, s: { border: 'thin', align: 'center', color: 'FF777777' } },
+            { v: was !== inf.text ? 'Yes' : '', s: { border: 'thin', align: 'center', bold: true, color: 'FF0000CC' } },
+            { v: holName[inf.d] || '', s: cell.s },
+            { v: inf.ml ? String.fromCharCode(9829) + ' ' + inf.ml : '', s: { border: 'thin', color: 'FFD81B60' } }
+        ];
+        if (partnerLabel) { var pc = partnerByDate[inf.d]; row.push({ v: pc ? pc.textContent.trim() : '', s: { fill: 'FFFFE4B5', border: 'thin', align: 'center' } }); }
+        srows.push(row);
+    });
+    wb.addSheet('Schedule', srows, { widths: partnerLabel ? [12, 6, 12, 13, 9, 24, 28, 18] : [12, 6, 12, 13, 9, 24, 28], freezeRow: 1 });
+
+    // ---- Sheet 3: Summary ----
+    var patWork = 0;
+    list.forEach(function (inf) { var was = origByDate[inf.d] !== undefined ? origByDate[inf.d] : inf.text; if (OFF_LIKE.indexOf(was.toUpperCase()) === -1) patWork++; });
+    var k = { bold: true, border: 'thin', fill: 'FFF0F0F0' }, v = { border: 'thin', align: 'center' };
+    var sum = [
+        [{ v: title, s: { bold: true, size: 14 } }],
+        [],
+        [{ v: 'Work days in the line pattern', s: k }, { v: patWork, s: v }],
+        [{ v: 'Work days now (after your changes)', s: k }, { v: workDays, s: v }],
+        [{ v: 'Days off now (incl. VAC, PPT, HOL, swaps off)', s: k }, { v: offDays, s: v }],
+        [{ v: 'Holidays off', s: k }, { v: holOff + ' of ' + holTot, s: v }],
+        [{ v: 'Days changed from the pattern', s: k }, { v: changed, s: v }],
+        [{ v: 'My Life dates', s: k }, { v: mlCount ? (mlOff + ' of ' + mlCount + ' off') : 'none', s: v }],
+        []
+    ];
+    if (swapPartners.length) {
+        sum.push([{ v: 'Swap partner', s: hdr }, { v: 'You received', s: hdr }, { v: 'You gave', s: hdr }, { v: 'Balance', s: hdr }]);
+        swapPartners.forEach(function (p) {
+            var rec = 0, gave = 0;
+            Object.keys(p.swaps || {}).forEach(function (x) { if (p.swaps[x].dir === 'receive') rec++; else gave++; });
+            var bal = rec - gave;
+            sum.push([{ v: (p.lineKey === partnerKey && partnerLabel) ? partnerLabel : p.lineKey, s: { border: 'thin', bold: true } }, { v: rec, s: v }, { v: gave, s: v },
+                { v: (bal > 0 ? '+' : '') + bal, s: { border: 'thin', align: 'center', bold: true, color: bal === 0 ? 'FF15803D' : 'FFB91C1C' } }]);
+        });
+        sum.push([]);
+    }
+    sum.push([{ v: 'This is your own plan from Your Edit. It does not change your real bid.', s: { size: 9, color: 'FF777777' } }]);
+    wb.addSheet('Summary', sum, { widths: [44, 14, 12, 12] });
+    return wb;
+}
+
+function saveExcel() {
+    try {
+        var blob = buildExcelWorkbook().toBlob();
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = excelFileName();
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+        showPlanToast('Saved ' + excelFileName() + ' for Excel. To reopen your plan in Your Edit later, use SAVE / OPEN (the plan file).');
+    } catch (e) {
+        showPlanToast('Could not make the Excel file: ' + e.message, true);
+    }
 }
 
 function openPlanPicker() {
