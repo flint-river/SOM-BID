@@ -3933,6 +3933,7 @@ body.print-legal .year-table td.day-num { font-size: 11px; height: 18px; }
 /* Partner row stays all beige; the SW- text marks swapped days */
 .compare-row td.compare-cell.cmp-got  { background: #ffe4b5 !important; color: #000 !important; }  /* you gave them your shift */
 .compare-row td.compare-cell.cmp-gave { background: #ffe4b5 !important; color: #000 !important; }  /* they gave their shift to you */
+.compare-row td.compare-cell.cmp-edit { background: #ffe4b5 !important; color: #000 !important; font-weight: bold; text-decoration: underline dotted #b45309; }  /* a change you planned on their line */
 .shift-cell.holiday-cell { font-weight: bold !important; border: 3px solid #FF0000 !important; }
 .edit-btn { padding: 6px 12px; cursor: pointer; font-size: 11px; font-weight: bold; border: 1px solid #666; border-radius: 4px; background: #fff; margin-left: 5px; }
 .edit-btn:hover { background: #e0e0e0; }
@@ -4340,11 +4341,12 @@ function captureState() {
             classes: cells[i].className.replace(/\\b(swap-selected|drag-over)\\b/g, '').replace(/\\s+/g, ' ').trim()
         });
     }
-    var swaps = {};
+    var swaps = {}, edits = {};
     for (var p = 0; p < swapPartners.length; p++) {
         swaps[swapPartners[p].lineKey] = JSON.parse(JSON.stringify(swapPartners[p].swaps || {}));
+        edits[swapPartners[p].lineKey] = JSON.parse(JSON.stringify(swapPartners[p].edits || {}));
     }
-    return { cells: result, swaps: swaps, active: activePartner ? activePartner.lineKey : null };
+    return { cells: result, swaps: swaps, edits: edits, active: activePartner ? activePartner.lineKey : null };
 }
 
 function restoreState(state) {
@@ -4358,6 +4360,8 @@ function restoreState(state) {
     }
     if (selectedMainCell) selectedMainCell = null;
     var saved = (state && state.swaps) || {};
+    var savedE = (state && state.edits) || {};
+    for (var ek in savedE) if (!saved[ek]) saved[ek] = {};
     // Bring back partners that were in the saved state (e.g. undoing an OPEN), keep any added since
     for (var key in saved) {
         var have = false;
@@ -4367,8 +4371,10 @@ function restoreState(state) {
             if (np) swapPartners.push(np);
         }
     }
+    var savedEdits = (state && state.edits) || {};
     for (var p = 0; p < swapPartners.length; p++) {
         swapPartners[p].swaps = JSON.parse(JSON.stringify(saved[swapPartners[p].lineKey] || {}));
+        swapPartners[p].edits = JSON.parse(JSON.stringify(savedEdits[swapPartners[p].lineKey] || {}));
     }
     if (state && state.active) {
         for (var a = 0; a < swapPartners.length; a++) if (swapPartners[a].lineKey === state.active) activePartner = swapPartners[a];
@@ -4717,7 +4723,7 @@ for (var ec = 0; ec < editableCells.length; ec++) {
 var ALL_DESKS = ${JSON.stringify(allDesksList)};
 
 // Show desk selection popup for COMP WORK
-function showDeskPopup(targetCell) {
+function showDeskPopup(targetCell, onPick) {
     // Create popup overlay
     var overlay = document.createElement('div');
     overlay.id = 'deskPopupOverlay';
@@ -4743,6 +4749,7 @@ function showDeskPopup(targetCell) {
         deskBtns[j].addEventListener('click', function() {
             var desk = this.getAttribute('data-desk');
             document.body.removeChild(overlay);
+            if (onPick) { onPick('CW-' + desk); return; }
             saveToUndo();
             targetCell.textContent = 'CW-' + desk;
             updateCellColor(targetCell);
@@ -4843,6 +4850,7 @@ for (var di = 0; di < dragItems.length; di++) {
     dragItems[di].addEventListener('dragstart', function(e) {
         draggedValue = this.getAttribute('data-value');
         draggedType = this.getAttribute('data-type') || 'timeoff';
+        draggedSourceCell = null;
         e.dataTransfer.effectAllowed = 'copy';
     });
     dragItems[di].addEventListener('click', function() {
@@ -5239,8 +5247,8 @@ function setActivePartner(lineKey) {
 
 function removeSwapPartner(lineKey) {
     for (var k = 0; k < swapPartners.length; k++) {
-        if (swapPartners[k].lineKey === lineKey && Object.keys(swapPartners[k].swaps || {}).length) {
-            if (!confirm('Remove L' + swapPartners[k].displayNum + '? Your swaps with this line stay on your schedule, but they will no longer be tracked or counted.')) return;
+        if (swapPartners[k].lineKey === lineKey && (Object.keys(swapPartners[k].swaps || {}).length || Object.keys(swapPartners[k].edits || {}).length)) {
+            if (!confirm('Remove L' + swapPartners[k].displayNum + '? Your swaps with this line stay on your schedule, but they will no longer be tracked or counted, and any changes you made on their line are dropped.')) return;
         }
     }
     var filtered = [];
@@ -5379,6 +5387,10 @@ function receiveShiftFromPartner(compareCell, mainCell) {
         return;
     }
     var shift = compareCell.getAttribute('data-value');
+    if (activePartner.edits && activePartner.edits[pDate] !== undefined) {
+        alert('You changed L' + activePartner.displayNum + ' on ' + niceDate(pDate) + ' to ' + activePartner.edits[pDate] + '. Put their day back (or use UNDO) before swapping it.');
+        return;
+    }
     if (!shift || shift === '--') return;
     var existing = findSwapForMainDate(mDate);
     if (existing) {
@@ -5426,6 +5438,10 @@ function giveShiftToPartner(mainCell, compareCell) {
         alert(niceDate(pDate) + ' already has a swap with L' + activePartner.displayNum + '. Undo that one first.');
         return;
     }
+    if (activePartner.edits && activePartner.edits[pDate] !== undefined) {
+        alert('You changed L' + activePartner.displayNum + ' on ' + niceDate(pDate) + ' to ' + activePartner.edits[pDate] + '. Put their day back (or use UNDO) before swapping onto it.');
+        return;
+    }
     if (pDate !== mDate && !confirm('You are giving your ' + niceDate(mDate) + ' shift onto their ' + niceDate(pDate) + '. Swaps are usually the same day. Do it anyway?')) return;
     var theirs = compareCell.getAttribute('data-value') || '--';
     if (theirs !== '--' && !confirm('L' + activePartner.displayNum + ' already works ' + theirs + ' on ' + niceDate(pDate) + '. Give them your shift anyway?')) return;
@@ -5449,13 +5465,123 @@ function trackSwap(direction) {
 }
 
 function clearAllPartners() {
-    var any = swapPartners.some(function (p) { return Object.keys(p.swaps || {}).length; });
-    if (any && !confirm('Clear all partners? Your swaps stay on your schedule, but they will no longer be tracked or counted.')) return;
+    var any = swapPartners.some(function (p) { return Object.keys(p.swaps || {}).length || Object.keys(p.edits || {}).length; });
+    if (any && !confirm('Clear all partners? Your swaps stay on your schedule, but they will no longer be tracked or counted, and any changes you made on partner lines are dropped.')) return;
     swapPartners = [];
     activePartner = null;
     comparisonLineData = null;
     updatePartnersPanel();
     clearComparisonLine();
+}
+
+// ---------- Partner row edits: time off, shifts, specials and COMP WK on the partner's line ----------
+// Kept in partner.edits[date] = code. The partner row shows: swap > your edit for them > their pattern.
+function partnerEdits(p) { p = p || activePartner; if (!p) return {}; if (!p.edits) p.edits = {}; return p.edits; }
+
+function placementCode(value, type) {
+    // Same choices as dropping on your own line. Returns null on Cancel.
+    if (type === 'shift') {
+        var c = prompt('Is this shift a:\\n1 = Regular assignment\\n2 = SWAP with coworker\\n3 = OT (Overtime)\\n4 = DT (Double Time)\\n5 = PTD (Paid Trade Day)\\n\\nEnter 1, 2, 3, 4, or 5:');
+        if (c === null) return null;
+        if (c === '2') return 'SW-' + value;
+        if (c === '3') return 'OT-' + value;
+        if (c === '4') return 'DT-' + value;
+        if (c === '5') return 'PTD-' + value;
+        return value;
+    }
+    if (type === 'special') {
+        var s = prompt(value + ' - Is this:\\n1 = COMP time\\n2 = OT (Overtime)\\n\\nEnter 1 or 2:');
+        if (s === null) return null;
+        if (s === '1') return 'C-' + value;
+        if (s === '2') return 'OT-' + value;
+        return value;
+    }
+    return value;
+}
+
+function partnerDayLocked(dateStr, quiet) {
+    if (activePartner && activePartner.swaps && activePartner.swaps[dateStr]) {
+        if (!quiet) alert(niceDate(dateStr) + ' on L' + activePartner.displayNum + ' is part of a swap with you. Undo the swap first (drag it back, or use UNDO).');
+        return true;
+    }
+    return false;
+}
+
+function setPartnerDay(dateStr, text) {
+    var base = lineCodeOn(activePartner.lineKey, dateStr);
+    var ed = partnerEdits();
+    if (text === base) delete ed[dateStr]; else ed[dateStr] = String(text).slice(0, 20);
+}
+
+// Put a code on one partner day (one UNDO step)
+function editPartnerCell(cell, value, type) {
+    if (!activePartner || !cell) return;
+    var d = cell.getAttribute('data-date');
+    if (partnerDayLocked(d)) return;
+    if (type === 'compwork') {
+        showDeskPopup(cell, function (code) { saveToUndo(); setPartnerDay(d, code); refreshPartnerViews(); });
+        return;
+    }
+    var text = placementCode(value, type);
+    if (text === null) return;
+    saveToUndo();
+    setPartnerDay(d, text);
+    refreshPartnerViews();
+}
+
+// Drops from the palette onto the partner row, and Quick Apply clicks on the partner row
+(function () {
+    var PALETTE = ['timeoff', 'shift', 'special', 'compwork'];
+    function cmp(e) { return e.target && e.target.closest ? e.target.closest('.compare-row.visible .compare-cell') : null; }
+    document.addEventListener('dragover', function (e) {
+        var c = cmp(e);
+        if (c && PALETTE.indexOf(draggedType) !== -1 && !draggedSourceCell) { e.preventDefault(); c.classList.add('drag-over'); }
+    });
+    document.addEventListener('drop', function (e) {
+        var c = cmp(e);
+        if (!c || PALETTE.indexOf(draggedType) === -1 || draggedSourceCell) return;
+        e.preventDefault();
+        c.classList.remove('drag-over');
+        var v = draggedValue, t = draggedType;
+        clearDragState();
+        editPartnerCell(c, v, t);
+    });
+    var lastPartnerQuick = null;
+    document.addEventListener('mousedown', function (e) {
+        if (!quickApplyValue) { lastPartnerQuick = null; return; }
+        var c = cmp(e);
+        if (!c || !activePartner) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.shiftKey && lastPartnerQuick && lastPartnerQuick !== c && document.body.contains(lastPartnerQuick) &&
+            (quickApplyType === 'timeoff' || !quickApplyType)) {
+            var cells = Array.prototype.slice.call(document.querySelectorAll('.compare-row.visible .compare-cell[data-date]'));
+            var a = cells.indexOf(lastPartnerQuick), b = cells.indexOf(c);
+            if (a > -1 && b > -1) {
+                if (a > b) { var t = a; a = b; b = t; }
+                saveToUndo();
+                var skipped = 0;
+                for (var j = a; j <= b; j++) {
+                    var d = cells[j].getAttribute('data-date');
+                    if (partnerDayLocked(d, true)) { skipped++; continue; }
+                    setPartnerDay(d, quickApplyValue);
+                }
+                refreshPartnerViews();
+                if (skipped) alert(skipped + ' partner day(s) that are part of a swap were left alone.');
+                lastPartnerQuick = c;
+                return;
+            }
+        }
+        editPartnerCell(c, quickApplyValue, quickApplyType || 'timeoff');
+        lastPartnerQuick = c;
+    }, true);
+})();
+
+function cleanEdits(ed) {
+    var out = {};
+    if (!ed || typeof ed !== 'object') return out;
+    for (var d in ed) if (/^\\d{4}-\\d{1,2}-\\d{1,2}$/.test(d) && ed[d] !== null && ed[d] !== undefined) out[d] = String(ed[d]).slice(0, 20);
+    return out;
 }
 
 // Initialize on page load
@@ -5508,13 +5634,18 @@ function displayComparisonLine(lineNum, data) {
         } else if (rec && rec.dir === 'give') {
             cell.textContent = 'SW-' + rec.shift; // you gave them your shift
             cell.classList.add('cmp-got');
+        } else if (activePartner && activePartner.edits && activePartner.edits[dateStr] !== undefined) {
+            cell.textContent = activePartner.edits[dateStr];   // your planned change on their line
         } else {
             cell.textContent = shift;
         }
         cell.setAttribute('data-value', shift);
         cell.setAttribute('draggable', 'true');
+        var hasEdit = !rec && activePartner && activePartner.edits && activePartner.edits[dateStr] !== undefined;
+        cell.classList.toggle('cmp-edit', !!hasEdit);
+        cell.title = hasEdit ? 'Changed: their line has ' + shift + ' here' : '';
 
-        if (shift === '--' && !rec) {
+        if (shift === '--' && !rec && !hasEdit) {
             cell.classList.add('off-day');
         } else {
             cell.classList.remove('off-day');
@@ -5550,7 +5681,8 @@ function setupComparisonDrag() {
         if (!c || !activePartner) return;
         var rec = activePartner.swaps[c.getAttribute('data-date')];
         var shift = c.getAttribute('data-value');
-        if ((rec && rec.dir === 'give') || (!rec && shift && shift !== '--')) {
+        var edited = activePartner.edits && activePartner.edits[c.getAttribute('data-date')] !== undefined;
+        if ((rec && rec.dir === 'give') || (!rec && !edited && shift && shift !== '--')) {
             draggedValue = rec ? rec.shift : shift;
             draggedType = 'swap';
             draggedSourceCell = c;
@@ -5615,7 +5747,8 @@ function clearComparisonLine() {
         compareCells[c].removeAttribute('data-value');
         compareCells[c].style.background = '';
         compareCells[c].style.color = '';
-        compareCells[c].classList.remove('cmp-gave', 'cmp-got');
+        compareCells[c].classList.remove('cmp-gave', 'cmp-got', 'cmp-edit');
+        compareCells[c].title = '';
     }
 }
 
@@ -5834,7 +5967,7 @@ function buildPlan() {
         savedAt: new Date().toISOString(),
         days: days,
         marks: marks,
-        partners: swapPartners.map(function (p) { return { lineKey: p.lineKey, swaps: JSON.parse(JSON.stringify(p.swaps || {})) }; }),
+        partners: swapPartners.map(function (p) { return { lineKey: p.lineKey, swaps: JSON.parse(JSON.stringify(p.swaps || {})), edits: JSON.parse(JSON.stringify(p.edits || {})) }; }),
         activePartner: activePartner ? activePartner.lineKey : null
     };
 }
@@ -6186,10 +6319,12 @@ function cleanSwaps(sw) {
     return out;
 }
 
-function partnerFromKey(lineKey, swaps) {
+function partnerFromKey(lineKey, swaps, edits) {
     var info = allLinesData[lineKey];
     if (!info) return null;
-    return { lineKey: lineKey, displayLabel: info.displayNum + '-' + info.lineDesc, displayNum: info.displayNum, data: { days: info.days, lineKey: lineKey }, swaps: cleanSwaps(swaps) };
+    var sw = cleanSwaps(swaps), ed = cleanEdits(edits);
+    for (var d in sw) delete ed[d];   // a swapped day can't also be edited
+    return { lineKey: lineKey, displayLabel: info.displayNum + '-' + info.lineDesc, displayNum: info.displayNum, data: { days: info.days, lineKey: lineKey }, swaps: sw, edits: ed };
 }
 
 function applyPlan(plan) {
@@ -6221,10 +6356,10 @@ function applyPlan(plan) {
     activePartner = null;
     comparisonLineData = null;
     clearComparisonLine();
-    var missing = 0, nSwaps = 0;
+    var missing = 0, nSwaps = 0, nPEdits = 0;
     (plan.partners || []).forEach(function (pp) {
-        var p = partnerFromKey(pp.lineKey, pp.swaps);
-        if (p) { swapPartners.push(p); nSwaps += Object.keys(p.swaps).length; } else { missing++; }
+        var p = partnerFromKey(pp.lineKey, pp.swaps, pp.edits);
+        if (p) { swapPartners.push(p); nSwaps += Object.keys(p.swaps).length; nPEdits += Object.keys(p.edits).length; } else { missing++; }
     });
     var act = null;
     for (var k = 0; k < swapPartners.length; k++) if (swapPartners[k].lineKey === plan.activePartner) act = swapPartners[k].lineKey;
@@ -6233,7 +6368,7 @@ function applyPlan(plan) {
 
     var when = plan.savedAt ? new Date(plan.savedAt).toLocaleString() : 'unknown time';
     var n = Object.keys(plan.days).length - skipped;
-    showPlanToast('Loaded plan saved ' + when + ': ' + n + ' changed ' + (n === 1 ? 'day' : 'days') + ', ' + swapPartners.length + ' ' + (swapPartners.length === 1 ? 'partner' : 'partners') + ', ' + nSwaps + ' ' + (nSwaps === 1 ? 'swap' : 'swaps') + (nMarks ? ', ' + nMarks + ' My Life ' + (nMarks === 1 ? 'day' : 'days') : '') + '. UNDO takes it back.' + (skipped || missing ? ' (' + (skipped + missing) + ' item(s) did not match this year and were skipped.)' : ''));
+    showPlanToast('Loaded plan saved ' + when + ': ' + n + ' changed ' + (n === 1 ? 'day' : 'days') + ', ' + swapPartners.length + ' ' + (swapPartners.length === 1 ? 'partner' : 'partners') + ', ' + nSwaps + ' ' + (nSwaps === 1 ? 'swap' : 'swaps') + (nMarks ? ', ' + nMarks + ' My Life ' + (nMarks === 1 ? 'day' : 'days') : '') + (nPEdits ? ', ' + nPEdits + ' partner ' + (nPEdits === 1 ? 'change' : 'changes') : '') + '. UNDO takes it back.' + (skipped || missing ? ' (' + (skipped + missing) + ' item(s) did not match this year and were skipped.)' : ''));
 }
 
 // Ctrl+S saves the plan file (instead of the browser's Save Page)
@@ -6377,7 +6512,7 @@ function scheduleIsClean() {
     for (var i = 0; i < all.length; i++) {
         if (orig[i] && all[i].textContent.trim() !== String(orig[i].text).trim()) return false;
     }
-    for (var p = 0; p < swapPartners.length; p++) if (Object.keys(swapPartners[p].swaps || {}).length) return false;
+    for (var p = 0; p < swapPartners.length; p++) if (Object.keys(swapPartners[p].swaps || {}).length || Object.keys(swapPartners[p].edits || {}).length) return false;
     return true;
 }
 
@@ -6601,8 +6736,10 @@ function savePartnerCopy() {
     if (!activePartner) return;
     var sw = activePartner.swaps || {};
     var keys = Object.keys(sw);
-    if (!keys.length) { alert('Make swaps with this partner first.'); return; }
+    var pEd = activePartner.edits || {};
+    if (!keys.length && !Object.keys(pEd).length) { alert('Make swaps with this partner, or changes on their line, first.'); return; }
     var days = {}, inverse = {};
+    Object.keys(pEd).forEach(function (d) { days[d] = pEd[d]; });   // changes you planned on their line
     keys.forEach(function (pDate) {
         var r = sw[pDate];
         var theirOrig = lineCodeOn(activePartner.lineKey, pDate);
