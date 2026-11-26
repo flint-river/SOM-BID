@@ -321,6 +321,12 @@
         .line-row.hidden-fav {
             display: none !important;
         }
+        .line-row.hidden-taken {
+            display: none !important;
+        }
+        .filter-empty {
+            padding: 18px; text-align: center; color: #9ca3af; font-style: italic;
+        }
         .line-row.holiday-filtered {
             display: none !important;
         }

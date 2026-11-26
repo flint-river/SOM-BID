@@ -1141,6 +1141,8 @@
         var lineToBidder = getLineToBidder();
         var favorites = loadFavorites();
         var showFavsOnly = document.getElementById('favoritesBtn').classList.contains('active');
+        var availOnly = isAvailableOnly();
+        var shown = 0;
 
         container.innerHTML = ANNUAL_BID.map(function(line) {
             var lineKey = line.lineNbr;  // Composite key like "5-SSOM"
@@ -1162,6 +1164,8 @@
             }
 
             var hiddenClass = (showFavsOnly && !isFavorite) ? ' hidden-fav' : '';
+            if (availOnly && isTaken) hiddenClass += ' hidden-taken';
+            if (!hiddenClass) shown++;
             var favClass = isFavorite ? ' favorite' : '';
 
             return '<div class="line-row ' + (isTaken ? 'taken' : '') + favClass + hiddenClass + '">' +
@@ -1171,9 +1175,32 @@
                 '<div class="line-bidder ' + (isTaken ? 'taken' : 'available') + '">' + (isTaken && isLineConfirmed(lineKey) ? '🔒 ' : '') + (bidder || 'Available') + '</div>' +
                 dayCells +
             '</div>';
-        }).join('');
-        
+        }).join('') + ((showFavsOnly || availOnly) && !shown
+            ? '<div class="filter-empty">' + (availOnly && showFavsOnly ? 'None of your favorite lines are still available.' : availOnly ? 'All lines are taken.' : 'No favorite lines yet. Click a star to add one.') + '</div>'
+            : '');
+
         updateFavoriteCount();
+        updateAvailableButton();
+    }
+
+    // ---- "Available Only": hide lines that are already taken (remembered in this browser) ----
+    function isAvailableOnly() {
+        try { return localStorage.getItem('polish_bid_available_only') === '1'; } catch (e) { return false; }
+    }
+    function updateAvailableButton() {
+        var btn = document.getElementById('availableBtn');
+        if (!btn) return;
+        var lineToBidder = getLineToBidder();
+        var avail = ANNUAL_BID.filter(function (l) { return !lineToBidder[l.lineNbr]; }).length;
+        var on = isAvailableOnly();
+        btn.classList.toggle('active', on);
+        btn.style.background = on ? '#e94560' : '#15803d';
+        btn.innerHTML = on ? '✅ Show All Lines' : '✅ Available Only (' + avail + ')';
+        btn.title = on ? 'Showing only lines nobody has taken yet. Click to show every line.' : 'Hide the lines that are already taken';
+    }
+    function toggleAvailableOnly() {
+        try { localStorage.setItem('polish_bid_available_only', isAvailableOnly() ? '0' : '1'); } catch (e) {}
+        renderAllLines();
     }
 
 function isLineConfirmed(lineNbr) {
@@ -8101,7 +8128,7 @@ window.addEventListener('DOMContentLoaded', function () {
             btn.style.background = '#e94560';
             btn.innerHTML = '⭐ Show All';
         } else {
-            btn.style.background = '#f0a500';
+            btn.style.background = '#9d174d';
             btn.innerHTML = '⭐ Favorites (<span id="favCount">' + loadFavorites().length + '</span>)';
         }
         renderAllLines();
